@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" fill="none">
+  <rect width="100" height="100" rx="22" fill="#ff6b5a"/>
+  <!-- Bold S path -->
+  <path d="M28 76 C42 76, 68 68, 68 56 C68 44, 30 42, 30 32 C30 24, 44 18, 58 18" stroke="white" stroke-width="3.8" stroke-linecap="round" fill="none"/>
+  <!-- Branch 1: off right bulge going down-right -->
+  <path d="M66 60 C70 64, 74 68, 76 72" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.28" stroke-dasharray="4 3.5"/>
+  <circle cx="76" cy="72" r="3" fill="white" opacity="0.18"/>
+  <!-- Branch 2: off left bulge going up-left -->
+  <path d="M32 36 C26 32, 22 28, 20 24" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.24" stroke-dasharray="4 3.5"/>
+  <circle cx="20" cy="24" r="3" fill="white" opacity="0.16"/>
+  <!-- Branch 3: off middle-left going left -->
+  <path d="M48 48 C40 52, 30 56, 22 56" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.22" stroke-dasharray="4 3.5"/>
+  <circle cx="22" cy="56" r="2.5" fill="white" opacity="0.15"/>
+  <!-- Branch 4: off middle-right going right -->
+  <path d="M52 44 C58 42, 66 40, 74 42" stroke="white" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.25" stroke-dasharray="4 3.5"/>
+  <circle cx="74" cy="42" r="2.5" fill="white" opacity="0.16"/>
+  <!-- X at destination -->
+  <line x1="62" y1="13" x2="70" y2="21" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <line x1="70" y1="13" x2="62" y2="21" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  <!-- Origin dot -->
+  <circle cx="28" cy="76" r="3" fill="white" opacity="0.35"/>
+</svg>
