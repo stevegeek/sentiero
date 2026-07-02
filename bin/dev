@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+usage() {
+  cat <<'HELP'
+Sentiero Development
+=====================
+
+Usage: bin/dev [command]
+
+Commands:
+  up            Start services (Redis)
+  down          Stop services
+  test          Start services + run all tests (including Redis)
+  demo          Start services + run demo app
+  status        Show service status
+  console       Open a Redis CLI session
+  help          Show this help
+
+Examples:
+  bin/dev up && bundle exec rake test   # Start Redis, run tests manually
+  bin/dev test                          # One command: start Redis + run tests
+  bin/dev demo                          # Start Redis + demo app
+HELP
+}
+
+ensure_services() {
+  cd "$ROOT_DIR"
+  if ! docker compose ps --status running 2>/dev/null | grep -q redis; then
+    echo "==> Starting services..."
+    docker compose up -d --wait
+  fi
+  echo "==> Redis running on localhost:6379"
+}
+
+up() {
+  cd "$ROOT_DIR"
+  docker compose up -d --wait
+  echo "==> Services running"
+  docker compose ps
+}
+
+down() {
+  cd "$ROOT_DIR"
+  docker compose down
+  echo "==> Services stopped"
+}
+
+run_tests() {
+  ensure_services
+  echo "==> Running tests..."
+  cd "$ROOT_DIR"
+  bundle exec rake
+}
+
+run_demo() {
+  ensure_services
+  exec "$ROOT_DIR/demo/run" start
+}
+
+status() {
+  cd "$ROOT_DIR"
+  docker compose ps
+}
+
+console() {
+  ensure_services
+  docker compose exec redis redis-cli
+}
+
+COMMAND="${1:-help}"
+
+case "$COMMAND" in
+  up)       up ;;
+  down)     down ;;
+  test)     run_tests ;;
+  demo)     run_demo ;;
+  status)   status ;;
+  console)  console ;;
+  help|-h|--help) usage ;;
+  *)
+    echo "Unknown command: $COMMAND"
+    echo ""
+    usage
+    exit 1
+    ;;
+esac

@@ -1,0 +1,5 @@
+<a href="<%= view.h(view.base_path) %>/sessions/<%= view.h(session_id) %>/windows/<%= view.h(window[:window_id]) %>"
+   class="<%= view.h(css_class) %>"
+   title="<%= view.h(window[:window_id]) %>">
+  Tab <%= tab_num %> &middot; <%= window[:event_count] %> events
+</a>

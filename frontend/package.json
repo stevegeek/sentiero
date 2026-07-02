@@ -1,0 +1,20 @@
+{
+  "name": "sentiero-recorder",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "fflate": "^0.8.0",
+    "rrweb": "2.0.0-alpha.20",
+    "web-vitals": "^4.2.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.2",
+    "esbuild": "^0.20.0",
+    "tailwindcss": "^4.2.2"
+  }
+}

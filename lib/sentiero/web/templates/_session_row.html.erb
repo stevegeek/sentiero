@@ -1,0 +1,42 @@
+<% meta = s[:metadata] || {} -%>
+<tr>
+  <% if selectable -%>
+    <td class="w-8 text-center"><input type="checkbox" name="session_ids[]" value="<%= view.h(s[:session_id]) %>" class="checkbox session-checkbox"></td>
+  <% end -%>
+  <td>
+    <% if s[:window_ids] && !s[:window_ids].empty? -%>
+      <a href="<%= view.h(view.base_path) %>/sessions/<%= view.h(s[:session_id]) %>" class="session-id font-medium text-blue-600 hover:text-blue-800">
+        <%= view.h(s[:session_id][0, 8]) %>
+      </a>
+    <% else -%>
+      <span class="session-id"><%= view.h(s[:session_id][0, 8]) %></span>
+    <% end -%>
+    <% if meta["has_errors"] -%>
+      <span class="badge badge-danger ml-1">errors</span>
+    <% end -%>
+  </td>
+  <td class="metadata-url text-gray-400" title="<%= view.h(meta["url"].to_s) %>">
+    <% if meta["url"] -%>
+      <% path = begin; URI.parse(meta["url"]).path; rescue; meta["url"]; end -%>
+      <%= view.h(path.to_s) %>
+    <% end -%>
+  </td>
+  <td>
+    <% if meta["userAgent"] -%>
+      <span class="text-gray-500" title="<%= view.h(meta["userAgent"]) %>"><%= view.h(view.parse_browser(meta["userAgent"]).to_s) %></span>
+      <% device = view.parse_device(meta["userAgent"]) -%>
+      <% if device == "Mobile" -%>
+        <span class="badge badge-warning ml-1">Mobile</span>
+      <% end -%>
+    <% end -%>
+  </td>
+  <td class="text-gray-500 tabular-nums"><%= s[:window_ids]&.size || 0 %></td>
+  <td class="text-gray-500 tabular-nums"><%= s[:event_count] || 0 %></td>
+  <td class="text-gray-500"><%= view.h(view.format_duration(s[:first_event_at], s[:last_event_at])) %></td>
+  <td class="text-gray-400 text-[10px]"><%= s[:updated_at] ? Time.at(s[:updated_at]).utc.strftime("%b %d, %H:%M") : "N/A" %></td>
+  <% if selectable -%>
+    <td class="text-right">
+      <button type="button" class="btn btn-xs btn-ghost-danger" data-action="delete-session" data-session-id="<%= view.h(s[:session_id]) %>" data-csrf-token="<%= view.h(csrf_token) %>" data-base-path="<%= view.h(view.base_path) %>">Delete</button>
+    </td>
+  <% end -%>
+</tr>

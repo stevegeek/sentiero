@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sentiero: Privacy-first session recording for Ruby</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/logo.svg" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            coral: { 50:'#fff5f3', 100:'#ffe8e3', 200:'#ffd1c7', 300:'#ffb09e', 400:'#ff8a72', 500:'#ff6b5a', 600:'#e8453a', 700:'#c4332a', 800:'#a12d26', 900:'#862b26' },
+            night: { 50:'#f7f7f8', 100:'#eeeef0', 200:'#d9d9de', 300:'#b6b6c0', 400:'#8e8e9d', 500:'#717183', 600:'#5c5c6b', 700:'#4b4b57', 800:'#2e2e36', 900:'#1c1c22' },
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
+            body: ['"DM Sans"', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    html { scroll-behavior: smooth; }
+    body { font-family: 'DM Sans', system-ui, sans-serif; }
+
+    /* Grain overlay */
+    .grain::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.022;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    }
+
+    /* Hero background blobs */
+    .hero-bg {
+      background:
+        radial-gradient(ellipse 60% 50% at 15% 20%, rgba(255,107,90,0.10) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 60% at 85% 70%, rgba(255,176,158,0.12) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 50% 90%, rgba(255,209,199,0.08) 0%, transparent 70%),
+        #fffbfa;
+    }
+
+    .code-block {
+      background: #1c1c22;
+      border-radius: 12px;
+      color: #e8e8ee;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.875rem;
+      line-height: 1.7;
+    }
+    .code-block .kw { color: #ff8a72; }
+    .code-block .str { color: #7ec699; }
+    .code-block .cmt { color: #717183; }
+    .code-block .fn { color: #ffd27f; }
+    .code-block .sym { color: #82aaff; }
+
+    /* Feature cards */
+    .feature-card {
+      background: white;
+      border: 1px solid #eeeef0;
+      border-radius: 16px;
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px -12px rgba(255,107,90,0.12), 0 8px 16px -8px rgba(0,0,0,0.06);
+    }
+
+    /* Privacy shield glow */
+    .shield-glow {
+      filter: drop-shadow(0 0 20px rgba(255,107,90,0.2));
+    }
+
+    /* Staggered fade-in */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up {
+      animation: fadeUp 0.7s ease-out both;
+    }
+    .fade-up-d1 { animation-delay: 0.1s; }
+    .fade-up-d2 { animation-delay: 0.2s; }
+    .fade-up-d3 { animation-delay: 0.3s; }
+    .fade-up-d4 { animation-delay: 0.4s; }
+    .fade-up-d5 { animation-delay: 0.5s; }
+
+    /* Scroll-triggered animation */
+    .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* Nav blur */
+    .nav-blur {
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background: rgba(255,251,250,0.85);
+    }
+
+    /* Badge */
+    .badge {
+      background: linear-gradient(135deg, #fff5f3, #ffe8e3);
+      border: 1px solid #ffd1c7;
+      color: #c4332a;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 999px;
+      letter-spacing: 0.03em;
+    }
+
+    /* Decorative path SVG */
+    .path-line {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      animation: draw 3s ease-out forwards;
+    }
+    @keyframes draw {
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* CTA button */
+    .btn-coral {
+      background: #ff6b5a;
+      color: white;
+      padding: 14px 32px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: background 0.2s, transform 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-coral:hover { background: #e8453a; transform: translateY(-1px); }
+
+    .btn-outline {
+      border: 1.5px solid #d9d9de;
+      color: #2e2e36;
+      padding: 14px 32px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1rem;
+      transition: border-color 0.2s, transform 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-outline:hover { border-color: #ff6b5a; color: #ff6b5a; transform: translateY(-1px); }
+
+    /* Capability pills */
+    .cap-pill {
+      background: #f7f7f8;
+      border: 1px solid #eeeef0;
+      color: #5c5c6b;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body class="grain text-night-800 antialiased">
+
+  <!-- NAV -->
+  <nav class="nav-blur fixed top-0 w-full z-50 border-b border-night-100/60">
+    <div class="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
+      <a href="/" class="flex items-center gap-2.5">
+        <svg width="30" height="30" viewBox="0 0 100 100" fill="none">
+          <rect width="100" height="100" rx="22" fill="#ff6b5a"/>
+          <path d="M28 76 C42 76, 68 68, 68 56 C68 44, 30 42, 30 32 C30 24, 44 18, 58 18" stroke="white" stroke-width="3.8" stroke-linecap="round" fill="none"/>
+          <path d="M66 60 C70 64, 74 68, 76 72" stroke="white" stroke-width="1.5" fill="none" opacity="0.28" stroke-dasharray="4 3.5"/>
+          <circle cx="76" cy="72" r="3" fill="white" opacity="0.18"/>
+          <path d="M32 36 C26 32, 22 28, 20 24" stroke="white" stroke-width="1.5" fill="none" opacity="0.24" stroke-dasharray="4 3.5"/>
+          <circle cx="20" cy="24" r="3" fill="white" opacity="0.16"/>
+          <path d="M48 48 C40 52, 30 56, 22 56" stroke="white" stroke-width="1.5" fill="none" opacity="0.22" stroke-dasharray="4 3.5"/>
+          <circle cx="22" cy="56" r="2.5" fill="white" opacity="0.15"/>
+          <path d="M52 44 C58 42, 66 40, 74 42" stroke="white" stroke-width="1.5" fill="none" opacity="0.25" stroke-dasharray="4 3.5"/>
+          <circle cx="74" cy="42" r="2.5" fill="white" opacity="0.16"/>
+          <line x1="62" y1="13" x2="70" y2="21" stroke="white" stroke-width="3" stroke-linecap="round"/>
+          <line x1="70" y1="13" x2="62" y2="21" stroke="white" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="28" cy="76" r="3" fill="white" opacity="0.35"/>
+        </svg>
+        <span class="font-display font-bold text-xl tracking-tight">Sentiero</span>
+      </a>
+      <div class="hidden md:flex items-center gap-8 text-sm font-medium text-night-600">
+        <a href="#features" class="hover:text-coral-600 transition-colors">Features</a>
+        <a href="#privacy" class="hover:text-coral-600 transition-colors">Privacy</a>
+        <a href="#quickstart" class="hover:text-coral-600 transition-colors">Quick Start</a>
+        <a href="#analytics" class="hover:text-coral-600 transition-colors">Analytics</a>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="https://github.com/stevegeek/sentiero" class="hidden sm:flex items-center gap-2 text-sm font-medium text-night-600 hover:text-night-900 transition-colors">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+        <a href="#quickstart" class="btn-coral text-sm !py-2.5 !px-5">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero-bg pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center max-w-3xl mx-auto">
+        <div class="fade-up">
+          <span class="badge">Open source &middot; Rack-compatible &middot; Privacy-first</span>
+        </div>
+        <h1 class="font-display font-extrabold text-5xl md:text-6xl lg:text-7xl tracking-tight mt-6 leading-[1.08] fade-up fade-up-d1" style="font-variation-settings:'opsz' 96">
+          See what your users see.<br/>
+          <span class="text-coral-500">Respect what they don't share.</span>
+        </h1>
+        <p class="text-lg md:text-xl text-night-500 mt-6 max-w-2xl mx-auto leading-relaxed fade-up fade-up-d2">
+          Sentiero is an open-source session recording gem for Ruby. Drop it into any Rack app (Rails, Sinatra, Hanami, Roda) and understand your users without compromising their privacy.
+        </p>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 fade-up fade-up-d3">
+          <a href="#quickstart" class="btn-coral">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+            Install the Gem
+          </a>
+          <a href="#features" class="btn-outline">See Features &rarr;</a>
+        </div>
+      </div>
+
+      <!-- Product screenshot -->
+      <div class="mt-16 md:mt-20 max-w-5xl mx-auto fade-up fade-up-d4">
+        <img src="/assets/screenshots/replay.png" alt="Sentiero session replay dashboard: rrweb playback with a color-coded event timeline and activity sidebar" class="rounded-2xl border border-night-100 shadow-2xl w-full" loading="lazy" />
+        <p class="text-center text-night-400 text-sm mt-4">Session replay in the built-in dashboard: timeline, activity sidebar, and Web Vitals.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOCIAL PROOF BAR -->
+  <section class="border-y border-night-100 bg-white py-8">
+    <div class="max-w-5xl mx-auto px-6 flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-night-400 text-sm font-medium">
+      <span>Works with</span>
+      <span class="flex items-center gap-2 text-night-700 font-semibold">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#cc0000"><path d="M2.5 2.5h8l3 3h-8l-3-3zm0 5.5h8l3 3h-8l-3-3zm0 5.5h8l3 3h-8l-3-3zm0 5.5h8l3 3h-8l-3-3z" opacity="0.5"/><rect x="6" y="4" width="14" height="16" rx="2" fill="#cc0000"/></svg>
+        Ruby on Rails
+      </span>
+      <span class="flex items-center gap-2 text-night-700 font-semibold">Sinatra</span>
+      <span class="flex items-center gap-2 text-night-700 font-semibold">Hanami</span>
+      <span class="flex items-center gap-2 text-night-700 font-semibold">Roda</span>
+      <span class="text-night-300">...any Rack app</span>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features" class="py-24 md:py-32 bg-white">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center max-w-2xl mx-auto mb-16 reveal">
+        <span class="badge">Core Features</span>
+        <h2 class="font-display font-bold text-3xl md:text-4xl mt-4 tracking-tight">A complete session recording toolkit</h2>
+        <p class="text-night-500 mt-4 text-lg">Self-hosted, framework-agnostic, and genuinely free. No artificial limits, no data leaves your servers.</p>
+      </div>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5 reveal">
+        <!-- Card 1: Session Recording -->
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Session Recording</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Full DOM recording powered by rrweb. Captures clicks, scrolls, navigations, and DOM mutations. Events are gzip-compressed, batched (time and count thresholds), and retried automatically on network failure.</p>
+        </div>
+        <!-- Card 2: Replay Dashboard -->
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Replay Dashboard</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Built-in admin viewer mounts inside your app. Browse and search sessions, replay with activity sidebar, color-coded event timeline, playback speed (1x to 16x), keyboard shortcuts, and multi-window tab switching.</p>
+        </div>
+        <!-- Card 3: Per-Session Heatmaps -->
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="18" rx="2"/><circle cx="8" cy="10" r="2" fill="#ff6b5a" opacity="0.3"/><circle cx="14" cy="8" r="3" fill="#ff6b5a" opacity="0.5"/><circle cx="11" cy="14" r="1.5" fill="#ff6b5a" opacity="0.2"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Per-Session Heatmaps</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Click positions rendered spatially on the DOM snapshot during replay. Scroll depth indicator shows how far the user scrolled. All computed client-side from loaded events, no extra server cost.</p>
+        </div>
+        <!-- Card 4: Custom Event Tracking -->
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Custom Event Tracking</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Track specific interactions with <code class="text-coral-600 bg-coral-50 px-1.5 py-0.5 rounded text-xs font-mono">window.Sentiero.addCustomEvent()</code> or declarative <code class="text-coral-600 bg-coral-50 px-1.5 py-0.5 rounded text-xs font-mono">data-sentiero-track-*</code> HTML attributes. Supports click, change, submit, focus, and blur events with optional JSON payloads.</p>
+        </div>
+        <!-- Card 5: Error Capture -->
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Error Capture</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Opt-in recording of JavaScript errors and unhandled promise rejections. Errors appear as markers in the replay timeline at the exact moment they occurred, with message, source file, line number, and stack trace.</p>
+          <span class="inline-block mt-3 text-xs font-semibold text-coral-600 bg-coral-50 px-2.5 py-1 rounded-full">Opt-in</span>
+        </div>
+        <!-- Card 6: Pluggable Storage -->
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Pluggable Storage</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Memory store for development. Redis with sorted sets and optional TTL for production. ActiveRecord for Rails apps. Or implement the store interface and bring your own backend. Configurable resource limits prevent unbounded growth.</p>
+        </div>
+      </div>
+
+      <!-- Also included -->
+      <div class="mt-12 text-center reveal">
+        <p class="text-night-400 text-sm font-medium mb-4">Also included</p>
+        <div class="flex flex-wrap items-center justify-center gap-2.5">
+          <span class="cap-pill">Cross-tab sessions</span>
+          <span class="cap-pill">JSON export</span>
+          <span class="cap-pill">Deep links with timestamp</span>
+          <span class="cap-pill">Session metadata capture</span>
+          <span class="cap-pill">Navigation tracking</span>
+          <span class="cap-pill">sendBeacon on page close</span>
+          <span class="cap-pill">Dashboard authentication</span>
+          <span class="cap-pill">CSRF protection</span>
+          <span class="cap-pill">CSP headers</span>
+          <span class="cap-pill">CORS whitelisting</span>
+          <span class="cap-pill">MIT licensed</span>
+          <span class="cap-pill">Cross-session analytics</span>
+          <span class="cap-pill">Conversion funnels</span>
+          <span class="cap-pill">Form analytics</span>
+          <span class="cap-pill">Session segmentation</span>
+          <span class="cap-pill">Shareable HTML replays</span>
+          <span class="cap-pill">Analytics export (CSV/JSON)</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANALYTICS -->
+  <section id="analytics" class="py-24 md:py-32 bg-night-50">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center max-w-2xl mx-auto mb-16 reveal">
+        <span class="badge">Cross-session analytics &middot; included</span>
+        <h2 class="font-display font-bold text-3xl md:text-4xl mt-4 tracking-tight">See patterns, not just sessions</h2>
+        <p class="text-night-500 mt-4 text-lg">Aggregate insight across every recorded session, computed on your own server and shipped in the open-source gem. No separate tier.</p>
+      </div>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5 reveal">
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><rect x="2" y="3" width="20" height="18" rx="2"/><circle cx="8" cy="10" r="2" fill="#ff6b5a" opacity="0.3"/><circle cx="14" cy="8" r="3" fill="#ff6b5a" opacity="0.5"/><circle cx="11" cy="15" r="1.5" fill="#ff6b5a" opacity="0.25"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Aggregate heatmaps</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Click density across all sessions for a page, attributed per URL so multi-page sessions don't blur together.</p>
+        </div>
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><path d="M12 3v18"/><path d="M6 9l6-6 6 6"/><path d="M6 15l6 6 6-6" opacity="0.4"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Scroll depth</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Per-page scroll-depth distribution with fold lines, so you can see how far visitors actually get.</p>
+        </div>
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v4H4z"/><path d="M4 12h10v4H4z"/><path d="M4 20h6"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Form analytics</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Field-level interaction and drop-off, with human-readable field labels resolved from the DOM. Values stay masked.</p>
+        </div>
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Conversion funnels</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Chain custom events into a funnel and watch where users fall out, step by step.</p>
+        </div>
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Segmentation</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">Filter sessions by browser, device, URL, metadata, error presence, or duration, and combine filters freely.</p>
+        </div>
+        <div class="feature-card p-7">
+          <div class="w-12 h-12 rounded-xl bg-coral-50 flex items-center justify-center mb-5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><path d="M12 3v12"/><path d="M8 11l4 4 4-4"/><path d="M4 21h16"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Export &amp; shareable replays</h3>
+          <p class="text-night-500 mt-2 text-sm leading-relaxed">CSV/JSON export of analytics data, plus self-contained HTML replays you can attach to a bug report. No server needed.</p>
+        </div>
+      </div>
+
+      <div class="mt-12 max-w-5xl mx-auto reveal">
+        <img src="/assets/screenshots/funnel.png" alt="Conversion funnel with per-step drop-off and median timings" class="rounded-2xl border border-night-100 shadow-xl w-full" loading="lazy" />
+      </div>
+    </div>
+  </section>
+
+  <!-- PRIVACY -->
+  <section id="privacy" class="py-24 md:py-32 bg-night-50 relative overflow-hidden">
+    <!-- Decorative path -->
+    <svg class="absolute top-0 right-0 w-96 h-96 text-coral-200 opacity-20 -translate-y-1/3 translate-x-1/4" viewBox="0 0 400 400" fill="none">
+      <path class="path-line" d="M20 380 C80 300, 120 200, 200 200 S360 100, 380 20" stroke="currentColor" stroke-width="2"/>
+    </svg>
+
+    <div class="max-w-6xl mx-auto px-6 relative z-10">
+      <div class="grid lg:grid-cols-2 gap-16 items-center">
+        <div class="reveal">
+          <span class="badge">Privacy by Design</span>
+          <h2 class="font-display font-bold text-3xl md:text-4xl mt-4 tracking-tight leading-snug">Privacy isn't a feature.<br/>It's the foundation.</h2>
+          <p class="text-night-500 mt-5 text-lg leading-relaxed">
+            Privacy-conscious defaults out of the box. All form inputs are masked. Password masking is enforced at the code level and cannot be disabled. Anything potentially invasive must be explicitly enabled by you.
+          </p>
+          <div class="space-y-5 mt-8">
+            <div class="flex gap-4">
+              <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-coral-100 flex items-center justify-center mt-0.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8453a" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <div>
+                <h4 class="font-display font-semibold">All form inputs masked by default</h4>
+                <p class="text-night-500 text-sm mt-1">Values typed into text fields, textareas, and selects are replaced with asterisks before reaching the server. Password masking is hardcoded in both Ruby and JavaScript and cannot be overridden.</p>
+              </div>
+            </div>
+            <div class="flex gap-4">
+              <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-coral-100 flex items-center justify-center mt-0.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8453a" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <div>
+                <h4 class="font-display font-semibold">Per-element recording control</h4>
+                <p class="text-night-500 text-sm mt-1">Block entire sections with <code class="text-coral-600 bg-coral-50 px-1 py-0.5 rounded text-xs font-mono">data-rr-block</code>, mask text with <code class="text-coral-600 bg-coral-50 px-1 py-0.5 rounded text-xs font-mono">data-rr-mask</code>, or ignore mutations with <code class="text-coral-600 bg-coral-50 px-1 py-0.5 rounded text-xs font-mono">data-rr-ignore</code>. Selectively unmask specific inputs with <code class="text-coral-600 bg-coral-50 px-1 py-0.5 rounded text-xs font-mono">data-sentiero-unmask</code> when needed.</p>
+              </div>
+            </div>
+            <div class="flex gap-4">
+              <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-coral-100 flex items-center justify-center mt-0.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8453a" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <div>
+                <h4 class="font-display font-semibold">Invasive features are opt-in only</h4>
+                <p class="text-night-500 text-sm mt-1">Error capture, navigation tracking, metadata collection, and custom event tracking are all off by default. Enable them individually as needed.</p>
+              </div>
+            </div>
+            <div class="flex gap-4">
+              <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-coral-100 flex items-center justify-center mt-0.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8453a" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <div>
+                <h4 class="font-display font-semibold">Self-hosted, no data leaves your server</h4>
+                <p class="text-night-500 text-sm mt-1">No third-party data processors, no SaaS middlemen, no phone-home. Your data stays in your infrastructure. GDPR compliance is simpler when you're both controller and processor.</p>
+              </div>
+            </div>
+            <div class="flex gap-4">
+              <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-coral-100 flex items-center justify-center mt-0.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e8453a" stroke-width="2.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+              </div>
+              <div>
+                <h4 class="font-display font-semibold">User opt-out and signal respect</h4>
+                <p class="text-night-500 text-sm mt-1">Built-in helpers let users disable recording. Global Privacy Control is supported and respected by default: the recorder reads <code class="text-coral-600 bg-coral-50 px-1 py-0.5 rounded text-xs font-mono">navigator.globalPrivacyControl</code> client-side, so if a browser signals "don't track me," the recorder won't start.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shield visual -->
+        <div class="flex items-center justify-center reveal">
+          <div class="relative">
+            <svg class="shield-glow" width="280" height="320" viewBox="0 0 280 320" fill="none">
+              <path d="M140 10 L260 60 V180 C260 250, 200 300, 140 310 C80 300, 20 250, 20 180 V60 Z" fill="url(#shield-grad)" stroke="#ff6b5a" stroke-width="1.5"/>
+              <defs>
+                <linearGradient id="shield-grad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#fff5f3"/>
+                  <stop offset="100%" stop-color="#ffe8e3"/>
+                </linearGradient>
+              </defs>
+              <!-- Lock icon inside shield -->
+              <rect x="115" y="120" width="50" height="40" rx="6" fill="#ff6b5a" opacity="0.15" stroke="#ff6b5a" stroke-width="1.5"/>
+              <path d="M125 120 V108 A15 15 0 01155 108 V120" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="140" cy="140" r="4" fill="#ff6b5a"/>
+              <line x1="140" y1="144" x2="140" y2="150" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"/>
+              <!-- Text -->
+              <text x="140" y="200" text-anchor="middle" fill="#c4332a" font-family="'Bricolage Grotesque',sans-serif" font-size="13" font-weight="600">PRIVACY BY DEFAULT</text>
+              <text x="140" y="220" text-anchor="middle" fill="#8e8e9d" font-family="'DM Sans',sans-serif" font-size="11">No tracking without consent</text>
+            </svg>
+            <!-- Floating badges -->
+            <div class="absolute -top-2 -right-4 bg-white shadow-lg rounded-xl px-4 py-2.5 text-xs font-semibold text-night-700 border border-night-100 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-green-400"></span>
+              GDPR-friendly
+            </div>
+            <div class="absolute bottom-16 -left-6 bg-white shadow-lg rounded-xl px-4 py-2.5 text-xs font-semibold text-night-700 border border-night-100 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-green-400"></span>
+              First-party cookies only
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- QUICK START -->
+  <section id="quickstart" class="py-24 md:py-32 bg-white">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center max-w-2xl mx-auto mb-14 reveal">
+        <span class="badge">Quick Start</span>
+        <h2 class="font-display font-bold text-3xl md:text-4xl mt-4 tracking-tight">Up and running in under a minute</h2>
+      </div>
+
+      <div class="max-w-2xl mx-auto space-y-6 reveal">
+        <!-- Step 1 -->
+        <div>
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-7 h-7 rounded-full bg-coral-500 text-white text-xs font-bold flex items-center justify-center">1</span>
+            <span class="font-display font-semibold text-sm">Add to your Gemfile</span>
+          </div>
+          <div class="code-block p-5 overflow-x-auto">
+            <span class="cmt"># Gemfile</span><br/>
+            <span class="kw">gem</span> <span class="str">"sentiero-rails"</span>
+          </div>
+        </div>
+        <!-- Step 2 -->
+        <div>
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-7 h-7 rounded-full bg-coral-500 text-white text-xs font-bold flex items-center justify-center">2</span>
+            <span class="font-display font-semibold text-sm">Run the install generator</span>
+          </div>
+          <div class="code-block p-5 overflow-x-auto">
+            <span class="kw">$</span> bundle install<br/>
+            <span class="kw">$</span> rails generate sentiero:install<br/>
+            <span class="kw">$</span> rails db:migrate
+          </div>
+        </div>
+        <!-- Step 3 -->
+        <div>
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-7 h-7 rounded-full bg-coral-500 text-white text-xs font-bold flex items-center justify-center">3</span>
+            <span class="font-display font-semibold text-sm">Mount the routes</span>
+          </div>
+          <div class="code-block p-5 overflow-x-auto">
+            <span class="cmt"># config/routes.rb</span><br/>
+            <span class="kw">mount</span> <span class="sym">Sentiero::Web::EventsApp</span>.<span class="fn">new</span> =&gt; <span class="str">"/sentiero/events"</span><br/>
+            <span class="kw">mount</span> <span class="sym">Sentiero::Web::DashboardApp</span>.<span class="fn">new</span> =&gt; <span class="str">"/sentiero"</span>
+          </div>
+        </div>
+        <!-- Step 4 -->
+        <div>
+          <div class="flex items-center gap-3 mb-3">
+            <span class="w-7 h-7 rounded-full bg-coral-500 text-white text-xs font-bold flex items-center justify-center">4</span>
+            <span class="font-display font-semibold text-sm">Add the recorder to your layout</span>
+          </div>
+          <div class="code-block p-5 overflow-x-auto">
+            <span class="cmt">&lt;%# app/views/layouts/application.html.erb %&gt;</span><br/>
+            <span class="kw">&lt;%=</span> <span class="fn">sentiero_script_tag</span> <span class="kw">%&gt;</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center mt-10 reveal">
+        <p class="text-night-400 text-sm">Using Roda, Sinatra, or plain Rack? The core <code class="text-coral-600 bg-coral-50 px-1.5 py-0.5 rounded text-xs font-mono">sentiero</code> gem works with any Rack-compatible framework. See the docs for framework-specific setup.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- OPEN SOURCE PROMISE -->
+  <section class="py-24 md:py-32 bg-night-50">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="max-w-3xl mx-auto text-center reveal">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-coral-50 mb-6">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 000-7.78z"/></svg>
+        </div>
+        <h2 class="font-display font-bold text-3xl md:text-4xl tracking-tight">Free means free. No tricks.</h2>
+        <p class="text-night-500 mt-5 text-lg leading-relaxed max-w-2xl mx-auto">
+          The community edition is MIT-licensed and feature-complete. It is not a trial, not a demo, and not a crippled version of a paid product. Session recording, replay, heatmaps, custom events, error capture, privacy controls, and export all ship in the open-source gem, with no artificial limits.
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6 mt-14 reveal">
+        <div class="bg-white rounded-2xl border border-night-100 p-7 text-center">
+          <div class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-coral-50 mb-4">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">No feature gates</h3>
+          <p class="text-night-500 text-sm mt-2 leading-relaxed">Every recording, replay, and privacy feature works without a license key, usage cap, or time limit. Free forever, in production, with no paywalled features.</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-night-100 p-7 text-center">
+          <div class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-coral-50 mb-4">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Community-driven</h3>
+          <p class="text-night-500 text-sm mt-2 leading-relaxed">Bug fixes, features, and security patches happen in the open. Contributions are welcome. The roadmap reflects what users actually need.</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-night-100 p-7 text-center">
+          <div class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-coral-50 mb-4">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ff6b5a" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+          </div>
+          <h3 class="font-display font-semibold text-lg">Analytics included</h3>
+          <p class="text-night-500 text-sm mt-2 leading-relaxed">Cross-session analytics (heatmaps, scroll depth, form analytics, conversion funnels, and segmentation) ship in the gem. No tier, no license key, no usage cap.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT COMPARES -->
+  <section id="compare" class="py-24 md:py-32 bg-white">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="text-center max-w-2xl mx-auto mb-16 reveal">
+        <span class="badge">How it compares</span>
+        <h2 class="font-display font-bold text-3xl md:text-4xl mt-4 tracking-tight">Where Sentiero fits</h2>
+        <p class="text-night-500 mt-4 text-lg">Two questions most people have. Here are the honest answers.</p>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-5 reveal">
+        <!-- vs rrweb -->
+        <div class="feature-card p-8">
+          <h3 class="font-display font-semibold text-xl">vs. raw rrweb</h3>
+          <p class="text-night-500 mt-3 text-sm leading-relaxed">
+            rrweb is the in-browser record and replay primitive. Sentiero builds the whole product around it: transport, storage, a replay dashboard, cross-session analytics (funnels, frustration signals, engagement, Web Vitals, conversions), and error tracking.
+          </p>
+          <p class="text-night-500 mt-3 text-sm leading-relaxed">
+            The bigger gap is privacy. rrweb gives you masking primitives; Sentiero adds a real privacy layer on top: enforced password masking, mask-all-inputs by default, Global Privacy Control respected by default, user opt-out, server-side sanitizers, IP anonymization, and retention plus erasure tooling.
+          </p>
+          <div class="flex flex-wrap items-center gap-2.5 mt-5">
+            <span class="cap-pill">Transport &amp; storage</span>
+            <span class="cap-pill">Replay dashboard</span>
+            <span class="cap-pill">Cross-session analytics</span>
+            <span class="cap-pill">Error tracking</span>
+            <span class="cap-pill">Privacy layer</span>
+          </div>
+        </div>
+
+        <!-- vs SaaS -->
+        <div class="feature-card p-8">
+          <h3 class="font-display font-semibold text-xl">vs. Hotjar &amp; SaaS tools</h3>
+          <p class="text-night-500 mt-3 text-sm leading-relaxed">
+            Hosted tools are quick to switch on, but your session data lives on someone else's servers and pricing scales with seats and sessions. Sentiero is self-hosted and embeddable: it mounts inside your own Ruby app, so recordings never leave your infrastructure.
+          </p>
+          <p class="text-night-500 mt-3 text-sm leading-relaxed">
+            It is open source and free with no seat caps, no session caps, and no paywalled features. The honest tradeoff: you run and scale it yourself, on the storage backend you already operate.
+          </p>
+          <div class="flex flex-wrap items-center gap-2.5 mt-5">
+            <span class="cap-pill">Self-hosted</span>
+            <span class="cap-pill">Data stays with you</span>
+            <span class="cap-pill">No seat or session caps</span>
+            <span class="cap-pill">Open source</span>
+            <span class="cap-pill">You run it yourself</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FINAL CTA -->
+  <section class="py-24 md:py-32 hero-bg">
+    <div class="max-w-3xl mx-auto px-6 text-center reveal">
+      <h2 class="font-display font-extrabold text-3xl md:text-5xl tracking-tight leading-tight">
+        Start understanding your users.<br/>
+        <span class="text-coral-500">Without selling them out.</span>
+      </h2>
+      <p class="text-night-500 mt-5 text-lg max-w-xl mx-auto">
+        Add Sentiero to your Gemfile, mount the routes, and you're recording sessions in under a minute. Free, open source, privacy-first.
+      </p>
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10">
+        <a href="#quickstart" class="btn-coral">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Get Started
+        </a>
+        <a href="https://github.com/stevegeek/sentiero" class="btn-outline">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-night-100 bg-white py-12">
+    <div class="max-w-6xl mx-auto px-6">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div class="flex items-center gap-2.5">
+          <svg width="24" height="24" viewBox="0 0 100 100" fill="none">
+            <rect width="100" height="100" rx="22" fill="#ff6b5a"/>
+            <path d="M28 76 C42 76, 68 68, 68 56 C68 44, 30 42, 30 32 C30 24, 44 18, 58 18" stroke="white" stroke-width="5.5" stroke-linecap="round" fill="none"/>
+            <line x1="62" y1="13" x2="70" y2="21" stroke="white" stroke-width="5.5" stroke-linecap="round"/>
+            <line x1="70" y1="13" x2="62" y2="21" stroke="white" stroke-width="5.5" stroke-linecap="round"/>
+          </svg>
+          <span class="font-display font-bold text-lg">Sentiero</span>
+          <span class="text-night-400 text-sm ml-2">Italian for <em>path</em></span>
+        </div>
+        <div class="flex items-center gap-8 text-sm text-night-500">
+          <a href="/guide/introduction/" class="hover:text-coral-600 transition-colors">Documentation</a>
+          <a href="https://github.com/stevegeek/sentiero" class="hover:text-coral-600 transition-colors">GitHub</a>
+          <a href="https://rubygems.org/gems/sentiero" class="hover:text-coral-600 transition-colors">RubyGems</a>
+        </div>
+      </div>
+      <div class="mt-8 pt-6 border-t border-night-100 text-center text-xs text-night-400">
+        MIT Licensed &middot; Made with care for the Ruby community
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scroll reveal script -->
+  <script>
+    const reveals = document.querySelectorAll('.reveal');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+    }, { threshold: 0.12 });
+    reveals.forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :vitals, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Web Vitals</h1>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics/vitals" class="flex items-end gap-2">
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+  </form>
+</div>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "samples") %>
+
+<% if view.sorted_pages.empty? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      No Web Vitals recorded yet. Enable <code class="font-mono">capture_web_vitals</code>
+      in the recorder config to start collecting LCP, INP and CLS.
+    </div>
+  </div>
+<% else -%>
+  <p class="text-xs text-gray-500 mb-3">
+    p75 of each metric per page, from the ratings the browser reported
+    (good / needs-improvement / poor). One sample is one page view &mdash; the
+    metric&rsquo;s final report on that page &mdash; measured by the
+    <code class="font-mono">web-vitals</code> library running in visitors&rsquo; browsers.
+  </p>
+
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Page</th>
+          <th class="text-right">LCP p75</th>
+          <th class="text-right">INP p75</th>
+          <th class="text-right">CLS p75</th>
+          <th>Rating mix</th>
+          <th>Slowest session</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% view.sorted_pages.each do |url, page| -%>
+          <% mix = view.page_rating_mix(page); mix_total = mix.values.sum; worst = view.slowest(page) -%>
+          <tr>
+            <td class="break-words max-w-xs">
+              <div><%= view.h(url) %></div>
+              <a class="text-blue-600 hover:text-blue-800 text-[10px]" href="<%= view.h(view.page_report_href(url)) %>">Page report &rarr;</a>
+            </td>
+            <% %w[LCP INP CLS].each do |metric| -%>
+              <% m = page[:metrics][metric] -%>
+              <td class="text-right tabular-nums">
+                <% if m -%>
+                  <span class="badge <%= view.rating_class(view.dominant_rating(m[:ratings])) %>">
+                    <%= view.h(view.format_vital(metric, m[:p75])) %>
+                  </span>
+                  <span class="text-[10px] text-gray-400 whitespace-nowrap">n=<%= m[:samples] %></span>
+                <% else -%>
+                  <span class="text-gray-400" title="The browser never reported this metric in range">&mdash; <span class="text-[10px]">(no reports)</span></span>
+                <% end -%>
+              </td>
+            <% end -%>
+            <td>
+              <% if mix_total > 0 -%>
+                <div class="flex h-2 w-24 rounded overflow-hidden" role="img"
+                     aria-label="<%= mix.map { |rating, count| "#{count} #{rating}" }.join(", ") %>">
+                  <% mix.each do |rating, count| -%>
+                    <% next if count == 0 -%>
+                    <div style="width:<%= (count.to_f / mix_total * 100).round(1) %>%;background:<%= view.rating_colors[rating] %>" title="<%= view.h(rating) %>: <%= count %>"></div>
+                  <% end -%>
+                </div>
+              <% else -%>
+                <span class="text-gray-400">&mdash;</span>
+              <% end -%>
+            </td>
+            <td>
+              <% if worst -%>
+                <a class="text-blue-600 hover:text-blue-800"
+                   href="<%= view.h(view.base_path) %>/sessions/<%= view.h(worst[:session_id].to_s) %>/windows/<%= view.h(worst[:window_id].to_s) %>?t=<%= worst[:offset_ms].to_i %>">Open in player &rarr;</a>
+              <% else -%>
+                <span class="text-gray-400">&mdash;</span>
+              <% end -%>
+            </td>
+          </tr>
+        <% end -%>
+      </tbody>
+    </table>
+  </div>
+<% end -%>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>

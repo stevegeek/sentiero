@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DEMO_DIR="$(cd "$(dirname "$0")" && pwd)"
+PORT="${PORT:-9292}"
+
+usage() {
+  cat <<'HELP'
+Sentiero Demo,  Trailhead (landing / signup / todo app)
+========================================================
+
+Usage: demo/run [command]
+
+Commands:
+  start         Install deps (if needed) and start the server (default)
+  install       Install dependencies only
+  stop          Stop any running demo server
+  open          Open the app in your default browser
+  dashboard     Open the dashboard in your default browser
+  status        Show whether the server is running
+  help          Show this help
+
+Environment variables:
+  PORT          Server port (default: 9292)
+
+Credentials:
+  Dashboard     demo / demo
+
+Quick start:
+  demo/run               # install + start on :9292
+  demo/run open          # open todo app in browser
+  demo/run dashboard     # open recording dashboard in browser
+
+Pages:
+  /        Marketing landing page (long + scrollable)
+  /signup  Signup form with plan select
+  /app     The todo app
+
+What to try (the funnel story):
+  1. Scroll the landing page, then click "Start free"   -> cta_clicked
+  2. On /signup, change the plan                        -> plan_selected {price: ...}
+  3. Submit the signup form                             -> signup_completed
+  4. In /app, add a todo                                -> todo_created
+  Then in the dashboard: build the funnel
+  cta_clicked -> plan_selected -> signup_completed -> todo_created
+
+Also try:
+  - Click "Watch the demo" on the landing page (it does nothing,
+    feeds the dead-click frustration detector)
+  - Click "Trigger JS error (demo)" in /app (client error tracking)
+  - Use the nav (Landing / Sign up / App / Guides) so sessions span
+    pages; "Guides" is external and feeds the external-navigation split
+  - Type in the "Masked Text Section" inputs in /app
+  - Notice the "Sensitive Section" has data-rr-block
+  - Visit the dashboard to replay your session and observe:
+    - Per-page heatmaps, scroll depth, and web vitals
+    - Text inputs show as asterisks (maskAllInputs)
+    - The blocked section is a blank placeholder
+    - Password fields are always masked
+HELP
+}
+
+install() {
+  echo "==> Installing dependencies..."
+  cd "$DEMO_DIR"
+  bundle install --quiet
+  echo "    Done."
+}
+
+ensure_installed() {
+  cd "$DEMO_DIR"
+  if ! bundle check --quiet > /dev/null 2>&1; then
+    install
+  fi
+}
+
+start() {
+  ensure_installed
+
+  # Stop existing if running
+  if pgrep -f "puma.*$PORT" > /dev/null 2>&1; then
+    echo "==> Server already running on port $PORT"
+    echo "    App:       http://localhost:$PORT"
+    echo "    Dashboard: http://localhost:$PORT/sentiero/dashboard/ (demo/demo)"
+    return
+  fi
+
+  echo "==> Starting Sentiero demo on port $PORT..."
+  cd "$DEMO_DIR"
+  bundle exec puma -p "$PORT" -b "tcp://0.0.0.0" &
+  SERVER_PID=$!
+
+  # Wait for server to be ready
+  for i in $(seq 1 30); do
+    if curl -s -o /dev/null "http://localhost:$PORT/" 2>/dev/null; then
+      echo ""
+      echo "==> Server running (PID $SERVER_PID)"
+      echo ""
+      echo "    App:       http://localhost:$PORT"
+      echo "    Dashboard: http://localhost:$PORT/sentiero/dashboard/ (demo/demo)"
+      echo ""
+      echo "    Press Ctrl+C to stop"
+      echo ""
+      wait $SERVER_PID
+      return
+    fi
+    sleep 0.3
+  done
+
+  echo "==> ERROR: Server failed to start within 10s"
+  kill $SERVER_PID 2>/dev/null
+  exit 1
+}
+
+stop() {
+  if pkill -f "puma.*$PORT" 2>/dev/null; then
+    echo "==> Stopped demo server"
+  else
+    echo "==> No demo server running on port $PORT"
+  fi
+}
+
+open_app() {
+  local url="http://localhost:$PORT"
+  echo "==> Opening $url"
+  if command -v xdg-open > /dev/null; then
+    xdg-open "$url"
+  elif command -v open > /dev/null; then
+    open "$url"
+  else
+    echo "    Open manually: $url"
+  fi
+}
+
+open_dashboard() {
+  local url="http://localhost:$PORT/sentiero/dashboard/"
+  echo "==> Opening $url (credentials: demo/demo)"
+  if command -v xdg-open > /dev/null; then
+    xdg-open "$url"
+  elif command -v open > /dev/null; then
+    open "$url"
+  else
+    echo "    Open manually: $url"
+  fi
+}
+
+status() {
+  if pgrep -f "puma.*$PORT" > /dev/null 2>&1; then
+    echo "==> Demo server is running on port $PORT"
+    echo "    PID: $(pgrep -f "puma.*$PORT")"
+  else
+    echo "==> Demo server is not running"
+  fi
+}
+
+# Default to start
+COMMAND="${1:-start}"
+
+case "$COMMAND" in
+  start)     start ;;
+  install)   install ;;
+  stop)      stop ;;
+  open)      open_app ;;
+  dashboard) open_dashboard ;;
+  status)    status ;;
+  help|-h|--help) usage ;;
+  *)
+    echo "Unknown command: $COMMAND"
+    echo ""
+    usage
+    exit 1
+    ;;
+esac

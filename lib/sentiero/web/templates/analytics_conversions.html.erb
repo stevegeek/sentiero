@@ -1,0 +1,94 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :conversions, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Conversions</h1>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics/conversions" class="flex items-end gap-2">
+    <div class="shrink-0">
+      <label for="tag" class="label">Conversion event</label>
+      <select name="tag" id="tag" class="select" style="width:12rem">
+        <option value="">&mdash;</option>
+        <% view.tags.each do |tag| -%>
+          <option value="<%= view.h(tag) %>" <%= (view.selected_tag == tag) ? "selected" : "" %>><%= view.h(tag) %></option>
+        <% end -%>
+      </select>
+    </div>
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+  </form>
+</div>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "sessions") %>
+
+<% if view.selected_tag.nil? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      Pick a conversion event tag to see how each acquisition source converts.
+      Tags are the custom-event tags your site records via
+      <code class="font-mono">Sentiero.track(tag)</code>; a session counts as a
+      conversion when that tag fires at least once anywhere in the session.
+    </div>
+  </div>
+<% else -%>
+  <% view.facets.each do |title, dimension, rows, kind| -%>
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium text-gray-900"><%= view.h(title) %></span>
+          <% if kind == :utm -%>
+            <span class="text-[10px] text-gray-400">only campaign-tagged sessions appear; untagged traffic is omitted</span>
+          <% end -%>
+        </div>
+        <% if rows.empty? -%>
+          <div class="text-center py-6 px-6 text-gray-400 text-xs">
+            No <%= view.h(dimension) %> data for this tag in range.
+          </div>
+        <% else -%>
+          <table class="w-full text-xs">
+            <thead>
+              <tr class="text-[10px] font-medium text-gray-400 uppercase tracking-wider text-left">
+                <th class="py-1"><%= view.h(dimension) %></th>
+                <th class="py-1 text-right">Sessions</th>
+                <th class="py-1 text-right">Conversions</th>
+                <th class="py-1 text-right">Rate</th>
+                <th class="py-1 text-right">Examples</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% rows.each do |row| -%>
+                <tr data-conv-key="<%= view.h(row[:key].to_s) %>"
+                    data-conv-sessions="<%= row[:sessions] %>"
+                    data-conv-conversions="<%= row[:conversions] %>"
+                    data-conv-rate="<%= row[:conversion_rate] %>">
+                  <td class="py-1 font-mono break-all text-gray-700"><%= view.h(row[:key].to_s) %></td>
+                  <td class="py-1 text-right tabular-nums"><%= row[:sessions] %></td>
+                  <td class="py-1 text-right tabular-nums"><%= row[:conversions] %></td>
+                  <td class="py-1 text-right tabular-nums">
+                    <% if row[:conversion_rate].nil? -%>
+                      <span class="text-gray-400">&mdash;</span>
+                    <% elsif row[:low_volume] -%>
+                      <span class="text-gray-400"><%= row[:conversion_rate] %>% (low volume)</span>
+                    <% else -%>
+                      <%= row[:conversion_rate] %>%
+                    <% end -%>
+                  </td>
+                  <td class="py-1 text-right whitespace-nowrap">
+                    <% if row[:converting_example] -%>
+                      <a class="text-blue-600 hover:text-blue-800" href="<%= view.player_link(row[:converting_example]) %>">converting &rarr;</a>
+                    <% end -%>
+                    <% if row[:non_converting_example] -%>
+                      <a class="text-blue-600 hover:text-blue-800 ml-2" href="<%= view.player_link(row[:non_converting_example]) %>">non-converting &rarr;</a>
+                    <% end -%>
+                  </td>
+                </tr>
+              <% end -%>
+            </tbody>
+          </table>
+        <% end -%>
+      </div>
+    </div>
+  <% end -%>
+<% end -%>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>

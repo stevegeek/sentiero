@@ -1,0 +1,195 @@
+<div class="card mb-3">
+  <div class="flex items-center gap-2 px-4 py-2.5">
+    <a href="<%= view.h(view.base_path) %>/" class="btn btn-sm btn-secondary shrink-0">&larr; Back</a>
+    <div class="w-px h-4 bg-gray-200 shrink-0"></div>
+    <% if view.meta && view.meta["userAgent"] -%>
+      <span class="badge badge-neutral shrink-0"><%= view.h(view.parse_browser(view.meta["userAgent"]).to_s) %></span>
+      <span class="badge badge-neutral shrink-0"><%= view.h(view.parse_device(view.meta["userAgent"]).to_s) %></span>
+    <% end -%>
+    <span id="viewport-info" class="badge badge-info shrink-0" style="display:none"></span>
+    <span id="scroll-depth-info" class="badge badge-info shrink-0" style="display:none"></span>
+    <span class="badge badge-neutral shrink-0"><%= view.h(view.duration_str) %></span>
+    <span class="badge badge-neutral shrink-0"><%= view.total_events %> events</span>
+    <span id="web-vitals-badges" class="items-center gap-2 shrink-0" style="display:none"></span>
+    <div class="flex-1"></div>
+    <button id="toggle-clicks-btn" class="btn btn-sm btn-secondary shrink-0" data-action="toggle-clicks" aria-pressed="false">Clicks</button>
+    <button id="copy-link-btn" class="btn btn-sm btn-secondary shrink-0" data-action="copy-link">Copy Link</button>
+    <button class="btn btn-sm btn-secondary shrink-0" data-action="download-json">Download JSON</button>
+    <% if view.shareable_replays -%>
+      <a class="btn btn-sm btn-secondary shrink-0" href="<%= view.h(view.base_path) %>/analytics/share/<%= view.h(view.session_id) %>">Download HTML</a>
+    <% end -%>
+  </div>
+</div>
+
+<% if view.multi_window? -%>
+  <div class="window-switcher">
+    <span class="window-switcher-label">Tabs</span>
+    <div class="flex items-center gap-1 flex-wrap">
+      <% view.tabs[:visible].each do |tab| -%>
+        <%= view.render_partial("_window_tab.html.erb", session_id: view.session_id,
+              window: tab[:window], tab_num: tab[:tab_num],
+              css_class: (tab[:window][:window_id] == view.window_id) ? "btn btn-sm btn-active" : "btn btn-sm btn-secondary") %>
+      <% end -%>
+      <% unless view.tabs[:overflow].empty? -%>
+        <details class="window-overflow">
+          <summary class="btn btn-sm btn-secondary">+<%= view.tabs[:overflow].size %> more</summary>
+          <div class="window-overflow-menu">
+            <% view.tabs[:overflow].each do |tab| -%>
+              <%= view.render_partial("_window_tab.html.erb", session_id: view.session_id,
+                    window: tab[:window], tab_num: tab[:tab_num],
+                    css_class: (tab[:window][:window_id] == view.window_id) ? "active" : "") %>
+            <% end -%>
+          </div>
+        </details>
+      <% end -%>
+    </div>
+  </div>
+<% end -%>
+
+<div class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-3">
+  <div>
+    <div class="player-frame">
+      <div id="event-markers" style="display:none"></div>
+      <div id="replayer"></div>
+    </div>
+  </div>
+  <div>
+    <div id="activity-sidebar" style="display:none">
+      <h6 class="text-xs font-semibold text-gray-700 mb-2 flex items-center gap-1.5">Activity <span id="activity-count" class="badge badge-neutral"></span></h6>
+      <div id="activity-list"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-4">
+  <div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 mb-3 uppercase tracking-wider">Session Details</h6>
+    <div class="grid grid-cols-[100px_1fr] gap-x-4 gap-y-2">
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Session ID</div>
+      <div class="session-id"><%= view.h(view.session_id) %></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Duration</div>
+      <div class="text-xs text-gray-600"><%= view.h(view.duration_str) %> <span id="active-time" class="text-gray-400" style="display:none"></span></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Started</div>
+      <div class="text-xs text-gray-600"><%= view.session[:created_at] ? Time.at(view.session[:created_at]).utc.strftime("%b %d, %Y %H:%M:%S UTC") : "N/A" %></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Tabs</div>
+      <div class="text-xs text-gray-600"><%= view.session[:windows]&.size || 0 %></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Total Events</div>
+      <div class="text-xs text-gray-600"><%= view.total_events %></div>
+
+      <% if view.multi_window? -%>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Per tab</div>
+        <div class="text-xs text-gray-600">
+          <% view.tabs[:all].each_with_index do |tab, i| -%>
+            Tab <%= tab[:tab_num] %>: <%= tab[:window][:event_count] %> events<%= i < view.tabs[:all].size - 1 ? ", " : "" %>
+          <% end -%>
+        </div>
+      <% end -%>
+
+      <% if view.meta -%>
+        <% if view.meta["url"] -%>
+          <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Page URL</div>
+          <div class="text-xs text-gray-600 break-all"><%= view.h(view.meta["url"]) %></div>
+        <% end -%>
+
+        <% if view.meta["referrer"] && !view.meta["referrer"].empty? -%>
+          <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Referrer</div>
+          <div class="text-xs text-gray-600 break-all"><%= view.h(view.meta["referrer"]) %></div>
+        <% end -%>
+
+        <% if view.meta["userAgent"] -%>
+          <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Browser</div>
+          <div class="text-xs text-gray-600"><%= view.h(view.parse_browser(view.meta["userAgent"]).to_s) %> (<%= view.h(view.parse_device(view.meta["userAgent"]).to_s) %>)</div>
+        <% end -%>
+
+        <% if view.meta["viewport"] -%>
+          <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Viewport</div>
+          <div class="text-xs text-gray-600"><%= view.h(view.meta["viewport"]) %></div>
+        <% end -%>
+
+        <% unless view.custom_keys.empty? -%>
+          <% view.custom_keys.each do |key| -%>
+            <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5"><%= view.h(key) %></div>
+            <div class="text-xs text-gray-600"><%= view.h(view.meta[key].to_s) %></div>
+          <% end -%>
+        <% end -%>
+      <% end -%>
+    </div>
+
+    <hr class="my-4 border-gray-100">
+    <form method="post" action="<%= view.h(view.base_path) %>/sessions/<%= view.h(view.session_id) %>/windows/<%= view.h(view.window_id) %>?_method=delete" class="inline">
+      <input type="hidden" name="csrf_token" value="<%= view.h(view.csrf_token) %>">
+      <button type="submit" class="btn btn-sm btn-ghost-danger" data-action="confirm-delete" data-confirm="<%= view.multi_window? ? "Delete this tab recording? This cannot be undone." : "Delete this recording and its session? This cannot be undone." %>">
+        <%= view.multi_window? ? "Delete this tab" : "Delete recording" %>
+      </button>
+    </form>
+  </div>
+</div>
+
+<% if view.server_activity && !view.server_activity.empty? -%>
+<div id="server-activity" class="card mt-4">
+  <div class="card-body">
+    <div class="flex items-center gap-3 mb-3 flex-wrap">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider">Server Activity</h6>
+      <div class="flex items-center gap-1" data-activity-filter-type>
+        <button type="button" class="btn btn-sm btn-active" data-filter-type="all">All</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-filter-type="exception">Exceptions</button>
+        <button type="button" class="btn btn-sm btn-secondary" data-filter-type="event">Events</button>
+      </div>
+      <select class="select" style="width:7rem" data-activity-filter-level>
+        <option value="">All levels</option>
+        <option value="info">info</option>
+        <option value="warn">warn</option>
+        <option value="error">error</option>
+        <option value="debug">debug</option>
+      </select>
+    </div>
+    <% view.server_activity.each do |item| -%>
+      <% if item[:kind] == "exception" -%>
+        <%- occ = item[:occurrence] -%>
+        <div class="flex items-start gap-2 py-1.5 border-l-2 border-red-400 bg-red-50 rounded mb-1 px-2" data-activity-row data-activity-kind="exception">
+          <span class="text-[10px] text-gray-400 shrink-0 tabular-nums font-mono pt-0.5">
+            <%= item[:timestamp] > 0 ? Time.at(item[:timestamp]).utc.strftime("%H:%M:%S") : "" %>
+          </span>
+          <span class="badge badge-danger shrink-0 text-[10px]">EXCEPTION</span>
+          <span class="badge badge-neutral shrink-0 text-[10px]"><%= view.h(occ["exception_class"].to_s) %></span>
+          <a href="<%= view.h(view.base_path) %>/issues/<%= view.h(occ["fingerprint"].to_s) %>" class="text-xs text-red-700 hover:text-red-900 flex-1 truncate">
+            <%= view.h(occ["message"].to_s[0, 100]) %>
+          </a>
+        </div>
+      <% else -%>
+        <%- event = item[:event] -%>
+        <div class="flex items-start gap-2 py-1.5 border-l-2 border-indigo-400 bg-indigo-50 rounded mb-1 px-2" data-activity-row data-activity-kind="event" data-activity-level="<%= view.h(event["level"].to_s) %>">
+          <span class="text-[10px] text-gray-400 shrink-0 tabular-nums font-mono pt-0.5">
+            <%= item[:timestamp] > 0 ? Time.at(item[:timestamp]).utc.strftime("%H:%M:%S") : "" %>
+          </span>
+          <span class="badge badge-info shrink-0 text-[10px]">EVENT</span>
+          <span class="badge badge-neutral shrink-0 text-[10px]"><%= view.h(event["level"].to_s) %></span>
+          <span class="text-xs text-indigo-700 flex-1">
+            <% if event["id"] -%>
+              <a href="<%= view.h(view.base_path) %>/custom-events/<%= view.h(event["id"].to_s) %>" class="text-indigo-700 hover:text-indigo-900 hover:underline"><%= view.h(event["name"].to_s) %></a>
+            <% else -%>
+              <%= view.h(event["name"].to_s) %>
+            <% end -%>
+            <% if event["payload"].is_a?(Hash) && !event["payload"].empty? -%>
+              <details class="inline-block align-middle ml-1">
+                <summary class="text-[10px] text-indigo-400 cursor-pointer select-none">payload</summary>
+                <div class="text-[10px] text-gray-600 bg-indigo-50 rounded p-1 mt-0.5 font-mono break-all"><%= view.h(event["payload"].to_json) %></div>
+              </details>
+            <% end -%>
+          </span>
+        </div>
+      <% end -%>
+    <% end -%>
+  </div>
+</div>
+<% end -%>
+
+<script type="application/json" id="sentiero-player-config"><%= view.escape_json(JSON.generate({eventsUrl: "#{view.base_path}/api/sessions/#{view.session_id}/windows/#{view.window_id}/events"})) %></script>
+<script type="application/json" id="server-activity-markers"><%= view.escape_json(JSON.generate(view.server_markers || [])) %></script>
+<link rel="stylesheet" href="<%= view.built_asset('rrweb-player-css') %>">
+<script src="<%= view.built_asset('rrweb-player') %>"></script>
+<script src="<%= view.built_asset('dashboard') %>"></script>

@@ -1,0 +1,14 @@
+<%
+  prev_qs = Rack::Utils.build_query(params.merge("page" => (page - 1).to_s))
+  next_qs = Rack::Utils.build_query(params.merge("page" => (page + 1).to_s))
+-%>
+<nav aria-label="Pagination" class="mt-3">
+  <ul class="pagination">
+    <li class="<%= "page-disabled" if page <= 1 %>">
+      <a class="page-link" href="<%= view.h(base_href) %>?<%= prev_qs %>">Previous</a>
+    </li>
+    <li class="<%= "page-disabled" unless has_next %>">
+      <a class="page-link" href="<%= view.h(base_href) %>?<%= next_qs %>">Next</a>
+    </li>
+  </ul>
+</nav>

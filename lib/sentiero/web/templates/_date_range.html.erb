@@ -1,0 +1,18 @@
+<%#
+  Shared From/To date-input pair for the standard `since`/`until` range
+  params (parsed UTC; the To-day is inclusive). Embed inside a GET form that
+  supplies the action and any other filter fields.
+
+  Locals: since (string), until_str (string); optional from_label / to_label
+  when the filtered column needs calling out (e.g. "Last seen from").
+-%>
+<% from_label = (defined?(from_label) && from_label) ? from_label : "From" -%>
+<% to_label = (defined?(to_label) && to_label) ? to_label : "To" -%>
+<div class="shrink-0">
+  <label for="since" class="label"><%= view.h(from_label) %></label>
+  <input type="date" name="since" id="since" class="input" style="width:8.5rem" value="<%= view.h(since) %>">
+</div>
+<div class="shrink-0">
+  <label for="until" class="label"><%= view.h(to_label) %></label>
+  <input type="date" name="until" id="until" class="input" style="width:8.5rem" value="<%= view.h(until_str) %>">
+</div>

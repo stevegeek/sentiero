@@ -1,0 +1,6 @@
+<% if sibling && sibling[:count] > 0 -%>
+  <span class="block mt-1">
+    <a href="<%= view.h(href) %>" class="text-blue-600 hover:text-blue-800"
+       data-sibling-count="<%= sibling[:count] %>"><%= sibling[:count] %><%= sibling[:capped] ? "+" : "" %> <%= view.h((sibling[:count] == 1 && !sibling[:capped]) ? noun : "#{noun}s") %> &rarr;</a>
+  </span>
+<% end -%>

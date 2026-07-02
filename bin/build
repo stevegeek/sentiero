@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+VERSION=$(ruby -r ./lib/sentiero/version -e "puts Sentiero::VERSION")
+
+echo "Building frontend..."
+cd frontend && npm run build
+cd ..
+
+echo "Building gems v${VERSION}..."
+
+# Clean previous builds
+rm -f sentiero-${VERSION}.gem sentiero-rails-${VERSION}.gem
+
+gem build sentiero.gemspec
+gem build sentiero-rails.gemspec
+
+echo ""
+echo "Built:"
+echo "  sentiero-${VERSION}.gem"
+echo "  sentiero-rails-${VERSION}.gem"

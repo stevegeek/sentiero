@@ -1,0 +1,95 @@
+<%# Signup form — funnel steps 2 and 3. Changing the plan fires
+    `plan_selected` via the JS API (window.Sentiero.addCustomEvent) with a
+    numeric price payload (feeds the numeric-payload metrics). Submitting
+    fires `signup_completed` via the declarative data-sentiero-track-submit
+    attribute; the change handler keeps data-sentiero-data in sync so the
+    submit event carries the chosen plan too. %>
+
+<h1 class="text-3xl font-bold text-gray-900 mb-2">Create your account</h1>
+<p class="text-sm text-gray-500 mb-8">
+  Pick a plan and start ticking things off. No credit card required for the demo.
+</p>
+
+<form
+  action="/signup"
+  method="post"
+  id="signup-form"
+  data-sentiero-track-submit="signup_completed"
+  data-sentiero-data='{"plan": "starter", "price": 9.0}'
+  class="bg-white rounded-lg shadow-sm p-6 space-y-5"
+>
+  <%= csrf_tag("/signup") %>
+
+  <div>
+    <label for="signup-name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+    <input
+      type="text"
+      id="signup-name"
+      name="name"
+      required
+      autofocus
+      placeholder="Ada Lovelace"
+      class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+    >
+  </div>
+
+  <div>
+    <label for="signup-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+    <input
+      type="email"
+      id="signup-email"
+      name="email"
+      required
+      placeholder="you@example.com"
+      class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+    >
+    <p class="text-xs text-gray-400 mt-1">Masked in replays; the server also redacts email-looking text from events.</p>
+  </div>
+
+  <div>
+    <label for="signup-plan" class="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+    <select
+      id="signup-plan"
+      name="plan"
+      class="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-base bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+    >
+      <option value="starter" data-price="9.0" selected>Starter — $9/month</option>
+      <option value="pro" data-price="29.0">Pro — $29/month</option>
+      <option value="team" data-price="79.0">Team — $79/month</option>
+    </select>
+    <p class="text-xs text-gray-400 mt-1">Changing this fires a <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">plan_selected</code> event with the price as a numeric payload.</p>
+  </div>
+
+  <button
+    type="submit"
+    class="w-full px-5 py-3 bg-emerald-600 text-white font-semibold rounded-lg text-base hover:bg-emerald-700 transition-colors"
+  >Create account</button>
+</form>
+
+<p class="text-xs text-gray-400 mt-6 text-center">
+  This is a demo — nothing is stored beyond your session.
+</p>
+
+<script>
+  // plan_selected via the recorder's public JS API, with a numeric price so
+  // the dashboard's numeric-payload metrics (sum/min/max per day) light up.
+  // Also mirror the choice into the form's data-sentiero-data so the
+  // declarative signup_completed submit event carries the final plan.
+  (function () {
+    var select = document.getElementById("signup-plan");
+    var form = document.getElementById("signup-form");
+
+    select.addEventListener("change", function () {
+      var option = select.options[select.selectedIndex];
+      var payload = {
+        plan: option.value,
+        price: parseFloat(option.getAttribute("data-price"))
+      };
+
+      if (window.Sentiero && window.Sentiero.addCustomEvent) {
+        window.Sentiero.addCustomEvent("plan_selected", payload);
+      }
+      form.setAttribute("data-sentiero-data", JSON.stringify(payload));
+    });
+  })();
+</script>

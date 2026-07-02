@@ -1,0 +1,36 @@
+<form method="get" action="<%= view.h(view.base_path) %>/issues">
+  <div class="card mb-4">
+    <div class="flex flex-wrap items-end gap-3 px-4 py-3">
+      <div class="shrink-0">
+        <label for="search" class="label">Search</label>
+        <input type="text" name="search" id="search" class="input w-56"
+               value="<%= view.h(search) %>" placeholder="Exception class or title…">
+      </div>
+      <div class="shrink-0">
+        <label for="status" class="label">Status</label>
+        <select name="status" id="status" class="select w-36">
+          <option value=""         <%= "selected" if status.empty? %>>All</option>
+          <option value="open"     <%= "selected" if status == "open" %>>Open</option>
+          <option value="resolved" <%= "selected" if status == "resolved" %>>Resolved</option>
+          <option value="ignored"  <%= "selected" if status == "ignored" %>>Ignored</option>
+        </select>
+      </div>
+      <div class="shrink-0">
+        <label for="sort_by" class="label">Sort by</label>
+        <select name="sort_by" id="sort_by" class="select w-36">
+          <option value="last_seen"  <%= "selected" if sort_by == "last_seen" %>>Last seen</option>
+          <option value="first_seen" <%= "selected" if sort_by == "first_seen" %>>First seen</option>
+          <option value="count"      <%= "selected" if sort_by == "count" %>>Count</option>
+        </select>
+      </div>
+      <%= view.render_partial("_date_range.html.erb",
+        since: since_param, until_str: until_param,
+        from_label: "Last seen from", to_label: "Last seen to") %>
+      <div class="shrink-0 flex items-center gap-1.5">
+        <input type="hidden" name="per_page" value="<%= per_page %>">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="<%= view.h(view.base_path) %>/issues" class="btn btn-secondary">Clear</a>
+      </div>
+    </div>
+  </div>
+</form>

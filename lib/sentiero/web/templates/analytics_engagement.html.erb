@@ -1,0 +1,101 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :engagement, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Engagement Scoring</h1>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics/engagement" class="flex items-end gap-2">
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <input type="hidden" name="sort" value="<%= view.h(view.sort) %>">
+    <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+  </form>
+</div>
+
+<p class="text-xs text-gray-500 mb-3">
+  This is a per-session <strong>struggle score (higher = more friction)</strong>
+  &mdash; a heuristic, not a verdict. It blends eight behavioural signals by fixed
+  weights: <strong>rage clicks</strong> (20%), <strong>dead clicks</strong> (15%),
+  <strong>nav churn</strong> (15%), <strong>idle ratio</strong> (10%),
+  <strong>thrashing scroll</strong> (10%), <strong>quick bounce</strong> (10%),
+  <strong>form refills</strong> (10%), and <strong>error abandonment</strong> (10%).
+</p>
+<p class="text-[10px] text-gray-400 mb-4">
+  Dead-click counts here are raw (pre-refinement) and may exceed the Frustration
+  page; a session can register both a dead click and error-abandonment for the
+  same crash.
+</p>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "sessions") %>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Score Distribution</h6>
+    <svg viewBox="0 0 <%= view.svg_width %> <%= view.svg_height %>" width="100%" style="max-width:<%= view.svg_width %>px" role="img" aria-label="Struggle score distribution across sessions">
+      <line x1="0" y1="<%= view.axis_y %>" x2="<%= view.svg_width %>" y2="<%= view.axis_y %>" stroke="#e5e7eb" stroke-width="1" />
+      <% view.distribution.each_with_index do |(label, count), i| -%>
+        <rect x="<%= view.bar_x(i) %>" y="<%= view.bar_y(count) %>" width="<%= view.bar_width %>" height="<%= view.bar_h(count) %>" fill="#2563eb" rx="2" />
+        <text x="<%= view.bar_x(i) + view.bar_width / 2 %>" y="<%= (view.bar_y(count) - 4).round(1) %>" text-anchor="middle" font-size="10" fill="#374151"><%= count %></text>
+        <text x="<%= view.bar_x(i) + view.bar_width / 2 %>" y="<%= view.axis_y + 14 %>" text-anchor="middle" font-size="9" fill="#6b7280"><%= view.h(label) %></text>
+      <% end -%>
+    </svg>
+  </div>
+</div>
+
+<% if view.sorted_sessions.empty? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      No sessions scored yet. Once sessions are recorded, the highest-struggle
+      ones rank here.
+    </div>
+  </div>
+<% else -%>
+  <div class="table-wrap mb-4">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>
+            <a class="<%= view.sort == "score" ? "font-semibold text-gray-900" : "text-blue-600 hover:text-blue-800" %>"
+               href="<%= view.h(view.sort_link("score")) %>">Score<%= view.sort == "score" ? " ↓" : "" %></a>
+          </th>
+          <th>Page</th>
+          <th class="text-right">
+            <a class="<%= view.sort == "duration" ? "font-semibold text-gray-900" : "text-blue-600 hover:text-blue-800" %>"
+               href="<%= view.h(view.sort_link("duration")) %>">Duration<%= view.sort == "duration" ? " ↓" : "" %></a>
+          </th>
+          <th>Signals</th>
+          <th class="text-right">Replay</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% view.sorted_sessions.each do |row| -%>
+          <tr>
+            <td class="tabular-nums"><span class="<%= view.badge_class(row[:score]) %>"><%= row[:score] %></span></td>
+            <td class="break-words max-w-xs"><%= row[:url] ? view.h(row[:url]) : "&mdash;" %></td>
+            <td class="text-right tabular-nums"><%= (row[:duration_ms] / 1000.0).round(1) %>s</td>
+            <td>
+              <% if view.chips(row[:signals]).empty? -%>
+                <span class="text-gray-400 text-xs">&mdash;</span>
+              <% else -%>
+                <% view.chips(row[:signals]).each do |chip| -%>
+                  <span class="badge badge-neutral mr-1 mb-1"><%= chip %></span>
+                <% end -%>
+              <% end -%>
+            </td>
+            <td class="text-right">
+              <a class="text-blue-600 hover:text-blue-800"
+                 href="<%= view.h(view.base_path) %>/sessions/<%= view.h(row[:session_id].to_s) %>/windows/<%= view.h(row[:window_id].to_s) %>?t=0">Open in player &rarr;</a>
+            </td>
+          </tr>
+        <% end -%>
+      </tbody>
+    </table>
+  </div>
+
+  <% if view.scanned > view.sorted_sessions.size -%>
+    <p class="text-[10px] text-gray-400 mb-4">
+      Showing top <%= view.sorted_sessions.size %> of <%= view.scanned %> scanned sessions.
+    </p>
+  <% end -%>
+<% end -%>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>

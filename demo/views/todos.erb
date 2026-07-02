@@ -1,0 +1,160 @@
+<%# The name is server-RENDERED PII: input masking only covers values the user
+    types, so the welcome heading would otherwise be captured as plain DOM text.
+    data-rr-mask hides this element's text in recordings (echo-back PII). %>
+<h1 class="text-3xl font-bold text-gray-900 mb-2"<%= @user_name ? " data-rr-mask" : "" %>>
+  <% if @user_name %>Welcome, <%= h(@user_name) %>!<% else %>Todo List<% end %>
+</h1>
+<p class="text-sm text-gray-500 mb-8">
+  Sentiero demo &mdash; your session is being recorded.
+  <a href="/sentiero/dashboard/" class="text-blue-600 hover:underline">View dashboard</a> (demo / demo)
+</p>
+
+<!-- Adding a todo fires the `todo_created` custom event (funnel step 4)
+     via the declarative data-sentiero-track-submit attribute. -->
+<form action="/todos" method="post" data-sentiero-track-submit="todo_created" class="flex gap-2 mb-8">
+  <%= csrf_tag("/todos") %>
+  <input
+    type="text"
+    name="text"
+    placeholder="What needs to be done?"
+    autofocus
+    class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+  >
+  <button
+    type="submit"
+    class="px-5 py-2.5 bg-blue-600 text-white font-medium rounded-lg text-base hover:bg-blue-700 transition-colors"
+  >Add</button>
+</form>
+
+<!-- e2e: button that throws an uncaught error to exercise error capture -->
+<button
+  type="button"
+  id="trigger-error-btn"
+  onclick="throw new Error('Sentiero e2e demo error');"
+  class="mb-8 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+>Trigger JS error (demo)</button>
+
+<% if @todos.empty? %>
+  <div class="text-center py-12 text-gray-400 text-base">No todos yet. Add one above!</div>
+<% else %>
+  <ul class="space-y-2 mb-4">
+    <% @todos.reverse.each do |todo| %>
+      <li class="flex items-center gap-3 px-4 py-3 bg-white rounded-lg shadow-sm">
+        <form action="/todos/<%= h(todo["id"]) %>/toggle" method="post" class="inline">
+          <%= csrf_tag("/todos/#{todo["id"]}/toggle") %>
+          <button type="submit" class="px-3 py-1 text-sm rounded font-medium transition-colors
+            <%= todo["done"] ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' %>
+          "><%= todo["done"] ? "Undo" : "Done" %></button>
+        </form>
+
+        <span class="flex-1 text-base <%= 'line-through text-gray-400' if todo["done"] %>">
+          <%= h(todo["text"]) %>
+        </span>
+
+        <span class="text-xs text-gray-400 hidden sm:inline"><%= todo["created_at"] %></span>
+
+        <form action="/todos/<%= h(todo["id"]) %>/delete" method="post" class="inline">
+          <%= csrf_tag("/todos/#{todo["id"]}/delete") %>
+          <button type="submit" class="px-3 py-1 text-sm rounded font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors">Delete</button>
+        </form>
+      </li>
+    <% end %>
+  </ul>
+
+  <div class="px-4 py-3 bg-white rounded-lg shadow-sm text-sm text-gray-500">
+    <%= @todos.count { |t| t["done"] } %> of <%= @todos.size %> completed
+  </div>
+<% end %>
+
+<div class="mt-8 p-4 bg-white rounded-lg shadow-sm" data-rr-block>
+  <h3 class="font-semibold text-gray-900 mb-2">Sensitive Section (blocked from recording)</h3>
+  <p class="text-xs text-gray-500 mb-3">
+    This section has <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">data-rr-block</code> &mdash; it will appear as a blank placeholder in replays.
+  </p>
+  <input
+    type="text"
+    placeholder="This input is inside a blocked section"
+    class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  >
+</div>
+
+<div class="mt-3 p-4 bg-white rounded-lg shadow-sm">
+  <h3 class="font-semibold text-gray-900 mb-2">Masked Text Section</h3>
+  <p class="text-xs text-gray-500 mb-3">
+    Inputs below are masked by default (<code class="bg-gray-100 px-1 py-0.5 rounded text-xs">maskAllInputs: true</code>). Try typing &mdash; replays will show asterisks.
+  </p>
+  <input
+    type="text"
+    placeholder="Type something here (will be masked in replay)"
+    class="w-full px-3 py-2 border border-gray-300 rounded text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+  >
+  <input
+    type="password"
+    placeholder="Password (always masked, enforced)"
+    class="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  >
+</div>
+
+<div class="mt-6 p-4 bg-amber-50 rounded-lg text-sm text-amber-800">
+  <strong class="block mb-1">Privacy demo</strong>
+  All form inputs are masked in recordings by default. The "Sensitive Section" above uses <code class="bg-amber-100 px-1 py-0.5 rounded text-xs">data-rr-block</code>
+  to completely hide its content from recordings. Password fields are always masked and cannot be unmasked.
+</div>
+
+<div class="mt-3 p-4 bg-white rounded-lg shadow-sm">
+  <h3 class="font-semibold text-gray-900 mb-2">🙈 Recording opt-out</h3>
+  <p class="text-xs text-gray-500 mb-3">
+    End users can opt out of being recorded. The button calls the recorder's
+    public API &mdash; <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">window.Sentiero.optOut()</code> /
+    <code class="bg-gray-100 px-1 py-0.5 rounded text-xs">optIn()</code>. Opting out sets a cookie + localStorage flag;
+    the recorder then skips initialization on the next load, and the server also
+    drops any events from an opted-out visitor (defense in depth).
+  </p>
+  <div class="flex items-center gap-3">
+    <button
+      type="button"
+      id="optout-toggle-btn"
+      class="px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 transition-colors"
+    ></button>
+    <span id="optout-status" class="text-sm text-gray-500"></span>
+  </div>
+</div>
+
+<script>
+  // Demonstrates Sentiero's end-user opt-out. The opt-out state lives in a
+  // cookie + localStorage (see opt_out.js); it takes effect on the next page
+  // load, so we reload after toggling. We read the cookie to reflect current
+  // state, matching the recorder's "truthy unless 0/false/empty" rule.
+  (function () {
+    var COOKIE = "sentiero_optout";
+    var btn = document.getElementById("optout-toggle-btn");
+    var status = document.getElementById("optout-status");
+
+    function optedOut() {
+      var hit = document.cookie.split("; ").find(function (c) {
+        return c.indexOf(COOKIE + "=") === 0;
+      });
+      var value = hit ? decodeURIComponent(hit.slice(COOKIE.length + 1)) : "";
+      try { value = value || (window.localStorage.getItem(COOKIE) || ""); } catch (e) {}
+      return value !== "" && value !== "0" && value !== "false";
+    }
+
+    function render() {
+      var out = optedOut();
+      btn.textContent = out ? "Opt back in (resume recording)" : "Opt out of recording";
+      status.textContent = out ? "🔴 Opted out — not being recorded." : "🟢 Currently being recorded.";
+    }
+
+    btn.addEventListener("click", function () {
+      var api = window.Sentiero || {};
+      if (optedOut()) {
+        if (api.optIn) api.optIn();
+      } else if (api.optOut) {
+        api.optOut();
+      }
+      location.reload();
+    });
+
+    render();
+  })();
+</script>

@@ -1,0 +1,74 @@
+class CreateSentieroTables < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+  def change
+    create_table :sentiero_sessions do |t|
+      t.string :session_id, null: false
+      t.json :metadata
+      t.timestamps
+    end
+
+    add_index :sentiero_sessions, :session_id, unique: true
+
+    create_table :sentiero_events do |t|
+      t.string :session_id, null: false
+      t.string :window_id, null: false
+      t.float :timestamp
+      t.json :data
+      t.datetime :created_at, null: false
+    end
+
+    add_index :sentiero_events, [:session_id, :window_id, :timestamp],
+      name: "index_sentiero_events_on_session_window_timestamp"
+    add_index :sentiero_events, :session_id
+
+    create_table :sentiero_problems do |t|
+      t.string :fingerprint, null: false
+      t.string :project, null: false
+      t.string :exception_class, null: false
+      t.string :title, null: false
+      t.string :message
+      t.integer :count, null: false, default: 0
+      t.string :status, null: false, default: "open"
+      t.float :first_seen, null: false
+      t.float :last_seen, null: false
+      t.float :resolved_at
+    end
+
+    add_index :sentiero_problems, :fingerprint, unique: true
+    add_index :sentiero_problems, :project
+    add_index :sentiero_problems, :status
+    add_index :sentiero_problems, :last_seen
+
+    create_table :sentiero_occurrences do |t|
+      t.string :occurrence_id, null: false
+      t.string :fingerprint, null: false
+      t.string :session_id
+      t.float :timestamp, null: false
+      t.json :data, null: false
+    end
+
+    add_index :sentiero_occurrences, [:fingerprint, :timestamp],
+      name: "index_sentiero_occurrences_on_fingerprint_timestamp"
+    add_index :sentiero_occurrences, :session_id
+    add_index :sentiero_occurrences, :occurrence_id, unique: true
+
+    create_table :sentiero_server_events do |t|
+      t.string :event_id, null: false
+      t.string :project, null: false
+      t.string :name, null: false
+      t.string :level
+      t.string :session_id
+      t.float :timestamp, null: false
+      t.json :data, null: false
+    end
+
+    add_index :sentiero_server_events, :project
+    add_index :sentiero_server_events, :session_id
+    add_index :sentiero_server_events, :event_id, unique: true
+
+    add_check_constraint :sentiero_problems, "status IN ('open', 'resolved', 'ignored')",
+      name: "sentiero_problems_status_check"
+
+    add_foreign_key :sentiero_events, :sentiero_sessions,
+      column: :session_id, primary_key: :session_id, on_delete: :cascade
+  end
+end

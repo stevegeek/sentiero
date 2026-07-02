@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+VERSION=$(ruby -r ./lib/sentiero/version -e "puts Sentiero::VERSION")
+
+echo "Running tests..."
+bundle exec rake || { echo "Tests failed, aborting release."; exit 1; }
+
+SENTIERO_GEM="sentiero-${VERSION}.gem"
+RAILS_GEM="sentiero-rails-${VERSION}.gem"
+
+# Always rebuild fresh to avoid shipping stale artifacts
+echo "Building gems..."
+rm -f "$SENTIERO_GEM" "$RAILS_GEM"
+bin/build
+
+echo "Releasing v${VERSION}..."
+echo ""
+
+# Push sentiero first (sentiero-rails depends on it)
+echo "Pushing ${SENTIERO_GEM}..."
+gem push "$SENTIERO_GEM"
+
+echo "Pushing ${RAILS_GEM}..."
+gem push "$RAILS_GEM"
+
+echo ""
+echo "Released sentiero v${VERSION} and sentiero-rails v${VERSION}"
+
+# Tag the release
+if git rev-parse "v${VERSION}" >/dev/null 2>&1; then
+  echo "Git tag v${VERSION} already exists, skipping."
+else
+  echo "Creating git tag v${VERSION}..."
+  git tag -a "v${VERSION}" -m "Release v${VERSION}"
+  echo "Don't forget to push the tag: git push origin v${VERSION}"
+fi

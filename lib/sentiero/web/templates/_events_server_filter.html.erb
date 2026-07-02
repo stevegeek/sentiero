@@ -1,0 +1,39 @@
+<form method="get" action="<%= view.h(view.base_path) %>/custom-events">
+  <div class="card mb-4">
+    <div class="flex flex-wrap items-end gap-3 px-4 py-3">
+      <div class="shrink-0">
+        <label for="search" class="label">Search</label>
+        <input type="text" name="search" id="search" class="input w-56"
+               value="<%= view.h(search) %>" placeholder="Event name…">
+      </div>
+      <div class="shrink-0">
+        <label for="level" class="label">Level</label>
+        <select name="level" id="level" class="select w-36">
+          <option value=""      <%= "selected" if level.empty? %>>All</option>
+          <option value="debug" <%= "selected" if level == "debug" %>>debug</option>
+          <option value="info"  <%= "selected" if level == "info" %>>info</option>
+          <option value="warn"  <%= "selected" if level == "warn" %>>warn</option>
+          <option value="error" <%= "selected" if level == "error" %>>error</option>
+        </select>
+      </div>
+      <% if projects && !projects.empty? -%>
+        <div class="shrink-0">
+          <label for="project" class="label">Project</label>
+          <select name="project" id="project" class="select w-40">
+            <option value="" <%= "selected" if project.empty? %>>All</option>
+            <% projects.each do |proj| -%>
+              <option value="<%= view.h(proj) %>" <%= "selected" if project == proj %>><%= view.h(proj) %></option>
+            <% end -%>
+          </select>
+        </div>
+      <% end -%>
+      <%= view.render_partial("_date_range.html.erb",
+        since: since_param, until_str: until_param) %>
+      <div class="shrink-0 flex items-center gap-1.5">
+        <input type="hidden" name="per_page" value="<%= per_page %>">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="<%= view.h(view.base_path) %>/custom-events" class="btn btn-secondary">Clear</a>
+      </div>
+    </div>
+  </div>
+</form>

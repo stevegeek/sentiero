@@ -1,0 +1,81 @@
+title: Sentiero
+description: Self-hosted, privacy-first browser session recording, replay, and product analytics for Ruby.
+url: "https://sentiero.app"
+baseurl: ""
+lang: en-US
+timezone: UTC
+
+markdown: kramdown
+kramdown:
+  input: GFM
+permalink: pretty
+
+theme: jekyll-vitepress-theme
+plugins:
+  - jekyll-vitepress-theme
+
+collections:
+  getting_started:
+    output: true
+    permalink: "/guide/:name/"
+  recording:
+    output: true
+    permalink: "/guide/:name/"
+  analytics:
+    output: true
+    permalink: "/guide/:name/"
+  setup:
+    output: true
+    permalink: "/guide/:name/"
+  frameworks:
+    output: true
+    permalink: "/guide/:name/"
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+  - scope:
+      type: getting_started
+    values:
+      layout: default
+  - scope:
+      type: recording
+    values:
+      layout: default
+  - scope:
+      type: analytics
+    values:
+      layout: default
+  - scope:
+      type: setup
+    values:
+      layout: default
+  - scope:
+      type: frameworks
+    values:
+      layout: default
+
+jekyll_vitepress:
+  branding:
+    site_title: Sentiero
+  syntax:
+    light_theme: github
+    dark_theme: github.dark
+  github_star:
+    enabled: true
+    repository: stevegeek/sentiero
+    text: Star
+    show_count: true
+
+exclude:
+  - _site
+  - .jekyll-cache
+  - vendor
+  - node_modules
+  - Gemfile
+  - Gemfile.lock
+  - DEPLOY.md
+  - template
+  - template_original

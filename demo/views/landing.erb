@@ -1,0 +1,155 @@
+<%# Marketing landing page. Deliberately tall so scroll-depth + page-position
+    heatmaps are interesting. The CTAs use Sentiero's declarative tracking
+    attributes (data-sentiero-track-click + data-sentiero-data) to fire
+    `cta_clicked` — funnel step 1. The "Watch the demo" button intentionally
+    does nothing: it feeds the dead-click frustration detector. %>
+
+<!-- Hero -->
+<header class="bg-gradient-to-b from-emerald-50 to-gray-50">
+  <div class="max-w-5xl mx-auto px-4 py-28 text-center">
+    <p class="text-sm font-semibold tracking-widest text-emerald-700 uppercase mb-4">Trailhead</p>
+    <h1 class="text-5xl font-extrabold text-gray-900 mb-5 leading-tight">
+      The todo list that keeps you<br>on the trail
+    </h1>
+    <p class="text-lg text-gray-600 max-w-2xl mx-auto mb-10">
+      Plan it, do it, check it off. Trailhead is the small, fast task app for
+      people who'd rather finish things than organize them.
+    </p>
+    <div class="flex items-center justify-center gap-4">
+      <a
+        href="/signup"
+        data-sentiero-track-click="cta_clicked"
+        data-sentiero-data='{"location": "hero"}'
+        class="px-8 py-3.5 bg-emerald-600 text-white text-base font-semibold rounded-lg hover:bg-emerald-700 transition-colors shadow"
+      >Start free</a>
+      <!-- Intentionally inert: no handler, no navigation (dead-click demo) -->
+      <button
+        type="button"
+        class="px-8 py-3.5 bg-white text-gray-700 text-base font-semibold rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors"
+      >Watch the demo</button>
+    </div>
+  </div>
+</header>
+
+<!-- Feature 1 -->
+<section class="bg-white border-t border-gray-100">
+  <div class="max-w-5xl mx-auto px-4 py-24 grid md:grid-cols-2 gap-12 items-center">
+    <div>
+      <h2 class="text-3xl font-bold text-gray-900 mb-4">Capture in seconds</h2>
+      <p class="text-gray-600 text-base leading-relaxed mb-4">
+        One box, one button. Type what's on your mind and hit Add — no
+        projects to file it under, no labels to pick, no due-date wizard
+        standing between you and an empty head.
+      </p>
+      <p class="text-gray-600 text-base leading-relaxed">
+        The fastest task app is the one you actually open. Trailhead loads
+        instantly and never asks you to "set up your workspace".
+      </p>
+    </div>
+    <div class="bg-emerald-50 rounded-2xl h-64 flex items-center justify-center text-6xl">📝</div>
+  </div>
+</section>
+
+<!-- Feature 2 -->
+<section class="bg-gray-50">
+  <div class="max-w-5xl mx-auto px-4 py-24 grid md:grid-cols-2 gap-12 items-center">
+    <div class="bg-amber-50 rounded-2xl h-64 flex items-center justify-center text-6xl order-last md:order-first">✅</div>
+    <div>
+      <h2 class="text-3xl font-bold text-gray-900 mb-4">Done feels good</h2>
+      <p class="text-gray-600 text-base leading-relaxed mb-4">
+        Check things off and watch the completed counter climb. Changed your
+        mind? Undo is one click — nothing in Trailhead is ever more than one
+        click away.
+      </p>
+      <p class="text-gray-600 text-base leading-relaxed">
+        Your list lives in your session: open the app and it's exactly where
+        you left it, with zero accounts-and-sync ceremony to slow you down.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- Feature 3 -->
+<section class="bg-white">
+  <div class="max-w-5xl mx-auto px-4 py-24 grid md:grid-cols-2 gap-12 items-center">
+    <div>
+      <h2 class="text-3xl font-bold text-gray-900 mb-4">Private by default</h2>
+      <p class="text-gray-600 text-base leading-relaxed mb-4">
+        Your todos are yours. Trailhead masks every input in session
+        recordings, blocks sensitive sections from replay entirely, and lets
+        you opt out of analytics with a single click.
+      </p>
+      <p class="text-gray-600 text-base leading-relaxed">
+        (This demo is itself instrumented with Sentiero — open the dashboard
+        to see exactly what gets recorded, and what never leaves the page.)
+      </p>
+    </div>
+    <div class="bg-blue-50 rounded-2xl h-64 flex items-center justify-center text-6xl">🔒</div>
+  </div>
+</section>
+
+<!-- Feature 4 -->
+<section class="bg-gray-50">
+  <div class="max-w-5xl mx-auto px-4 py-24 grid md:grid-cols-2 gap-12 items-center">
+    <div class="bg-purple-50 rounded-2xl h-64 flex items-center justify-center text-6xl order-last md:order-first">⚡</div>
+    <div>
+      <h2 class="text-3xl font-bold text-gray-900 mb-4">No app to install</h2>
+      <p class="text-gray-600 text-base leading-relaxed mb-4">
+        Trailhead runs anywhere a browser does. No download, no extension,
+        no notification permission prompt — just a URL you can open from any
+        machine and start ticking things off.
+      </p>
+      <p class="text-gray-600 text-base leading-relaxed">
+        Starter plans begin at $9/month, and you can try everything free
+        before picking one.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- Testimonials -->
+<section class="bg-white border-t border-gray-100">
+  <div class="max-w-5xl mx-auto px-4 py-24">
+    <h2 class="text-3xl font-bold text-gray-900 text-center mb-14">Loved by list-makers</h2>
+    <div class="grid md:grid-cols-3 gap-6">
+      <figure class="bg-gray-50 rounded-xl p-6">
+        <blockquote class="text-gray-700 text-sm leading-relaxed mb-4">
+          “I've tried every task app on earth. Trailhead is the first one
+          that's faster than a sticky note.”
+        </blockquote>
+        <figcaption class="text-sm font-semibold text-gray-900">Mara K. <span class="font-normal text-gray-500">— Product Manager</span></figcaption>
+      </figure>
+      <figure class="bg-gray-50 rounded-xl p-6">
+        <blockquote class="text-gray-700 text-sm leading-relaxed mb-4">
+          “The Done button has replaced my entire productivity system. My
+          therapist says that's fine.”
+        </blockquote>
+        <figcaption class="text-sm font-semibold text-gray-900">Dev R. <span class="font-normal text-gray-500">— Freelance Developer</span></figcaption>
+      </figure>
+      <figure class="bg-gray-50 rounded-xl p-6">
+        <blockquote class="text-gray-700 text-sm leading-relaxed mb-4">
+          “We rolled Trailhead out to the whole team in an afternoon. Nobody
+          asked a single onboarding question.”
+        </blockquote>
+        <figcaption class="text-sm font-semibold text-gray-900">Priya S. <span class="font-normal text-gray-500">— Engineering Lead</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<!-- Footer CTA -->
+<footer class="bg-gray-900">
+  <div class="max-w-5xl mx-auto px-4 py-24 text-center">
+    <h2 class="text-3xl font-bold text-white mb-4">Ready to hit the trail?</h2>
+    <p class="text-gray-400 text-base mb-10">Free to try. Plans from $9/month. Cancel any time.</p>
+    <a
+      href="/signup"
+      data-sentiero-track-click="cta_clicked"
+      data-sentiero-data='{"location": "footer"}'
+      class="inline-block px-8 py-3.5 bg-emerald-500 text-white text-base font-semibold rounded-lg hover:bg-emerald-400 transition-colors"
+    >Start free</a>
+    <p class="text-gray-600 text-xs mt-14">
+      Trailhead is a demo app for <a href="/sentiero/dashboard/" class="underline hover:text-gray-400">Sentiero</a> session analytics. Your visit is being recorded.
+    </p>
+  </div>
+</footer>

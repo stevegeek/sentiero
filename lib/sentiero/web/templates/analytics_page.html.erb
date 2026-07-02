@@ -1,0 +1,287 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :pages, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Page Report</h1>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics/page" class="flex items-end gap-2">
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <div class="shrink-0">
+      <label for="url" class="label">Page</label>
+      <select name="url" id="url" class="select" style="width:22rem">
+        <option value="">Select a page&hellip;</option>
+        <% view.urls.each do |u| -%>
+          <option value="<%= view.h(u) %>" <%= u == view.selected_url ? "selected" : "" %>><%= view.h(u) %></option>
+        <% end -%>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+  </form>
+</div>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated) %>
+
+<% if view.report.nil? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      <% if view.urls.empty? -%>
+        No recorded pages yet.
+      <% else -%>
+        Pick a page above to see its per-URL report &mdash; time on page,
+        entries/exits, clicks, scroll depth, form completion, Web Vitals,
+        errors, frustration signals and custom events for that single URL.
+      <% end -%>
+    </div>
+  </div>
+<% elsif view.report[:page_views].zero? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      No data recorded for <code class="font-mono"><%= view.h(view.report[:url]) %></code> in this range.
+    </div>
+  </div>
+<% else -%>
+  <div class="flex items-center justify-between mb-3">
+    <h2 class="text-sm font-medium text-gray-900 break-words"><%= view.h(view.report[:url]) %></h2>
+    <a class="text-blue-600 hover:text-blue-800 text-xs" href="<%= view.h(view.heatmap_href) %>">Open full heatmap &rarr;</a>
+  </div>
+
+  <%# ── summary cards ── -%>
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+    <div class="card"><div class="card-body">
+      <div class="text-[10px] uppercase tracking-wider text-gray-400">Sessions</div>
+      <div class="text-xl font-semibold tabular-nums"><%= view.report[:sessions] %></div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="text-[10px] uppercase tracking-wider text-gray-400">Page views</div>
+      <div class="text-xl font-semibold tabular-nums"><%= view.report[:page_views] %></div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="text-[10px] uppercase tracking-wider text-gray-400">Time on page (mean)</div>
+      <div class="text-xl font-semibold tabular-nums"><%= view.secs(view.time_on_page[:mean_ms]) %></div>
+      <div class="text-[10px] text-gray-400">median <%= view.secs(view.time_on_page[:median_ms]) %>, n=<%= view.time_on_page[:samples] %></div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="text-[10px] uppercase tracking-wider text-gray-400">Bounce rate</div>
+      <div class="text-xl font-semibold tabular-nums"><%= view.pct(view.entry_exit[:bounce_rate]) %></div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="text-[10px] uppercase tracking-wider text-gray-400">Entries</div>
+      <div class="text-xl font-semibold tabular-nums"><%= view.entry_exit[:entries] %></div>
+    </div></div>
+    <div class="card"><div class="card-body">
+      <div class="text-[10px] uppercase tracking-wider text-gray-400">Exits</div>
+      <div class="text-xl font-semibold tabular-nums"><%= view.entry_exit[:exits] %></div>
+    </div></div>
+  </div>
+
+  <%# ── heatmap ── -%>
+  <div class="card mb-3"><div class="card-body">
+    <div class="flex items-center justify-between mb-2">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider">Heatmap</h6>
+      <a class="text-blue-600 hover:text-blue-800 text-xs" href="<%= view.h(view.heatmap_href) %>">Open full heatmap &rarr;</a>
+    </div>
+    <% if view.report[:heatmap][:total_clicks].zero? -%>
+      <p class="text-xs text-gray-400">No clicks recorded on this page.</p>
+    <% else -%>
+      <p class="text-xs text-gray-500 mb-2"><%= view.report[:heatmap][:total_clicks] %> total clicks.</p>
+      <table class="w-full text-xs">
+        <thead><tr><th class="text-left py-1 text-gray-500">Element</th><th class="text-right py-1 text-gray-500">Clicks</th></tr></thead>
+        <tbody>
+          <% view.report[:heatmap][:top_elements].each do |el| -%>
+            <tr>
+              <td class="py-1 font-mono break-all"><%= view.h(el[:selector]) %></td>
+              <td class="py-1 text-right tabular-nums text-gray-500"><%= el[:count] %></td>
+            </tr>
+          <% end -%>
+        </tbody>
+      </table>
+    <% end -%>
+  </div></div>
+
+  <%# ── scroll ── -%>
+  <div class="card mb-3"><div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Scroll Depth</h6>
+    <% if view.scroll.nil? -%>
+      <p class="text-xs text-gray-400">No scroll recorded on this page.</p>
+    <% else -%>
+      <div class="text-xs text-gray-500 mb-3">
+        <%= view.scroll[:session_count] %> session<%= view.scroll[:session_count] == 1 ? "" : "s" %>,
+        avg depth <%= view.scroll[:avg_depth_px].round %>px<%
+          if view.scroll[:avg_depth_pct] %> (~<%= view.scroll[:avg_depth_pct].round %>% of the page)<% end %><%
+          if view.scroll[:page_height_px] %>, est. page height <%= view.scroll[:page_height_px].round %>px<% end %>.
+      </div>
+      <table class="w-full text-xs">
+        <tbody>
+          <tr><td class="py-1 text-gray-500">50th percentile</td><td class="py-1 text-right tabular-nums"><%= view.scroll[:fold_lines][:p50] ? "#{view.scroll[:fold_lines][:p50].round}% of page" : "&mdash;" %></td></tr>
+          <tr><td class="py-1 text-gray-500">75th percentile</td><td class="py-1 text-right tabular-nums"><%= view.scroll[:fold_lines][:p75] ? "#{view.scroll[:fold_lines][:p75].round}% of page" : "&mdash;" %></td></tr>
+          <tr><td class="py-1 text-gray-500">90th percentile</td><td class="py-1 text-right tabular-nums"><%= view.scroll[:fold_lines][:p90] ? "#{view.scroll[:fold_lines][:p90].round}% of page" : "&mdash;" %></td></tr>
+        </tbody>
+      </table>
+      <table class="w-full text-xs mt-2">
+        <thead><tr><th class="text-left py-1 text-gray-500">Depth bin</th><th class="text-right py-1 text-gray-500">Sessions</th></tr></thead>
+        <tbody>
+          <% view.scroll[:distribution].each do |label, count| -%>
+            <tr><td class="py-1"><%= view.h(label) %>%</td><td class="py-1 text-right tabular-nums text-gray-500"><%= count %></td></tr>
+          <% end -%>
+        </tbody>
+      </table>
+    <% end -%>
+  </div></div>
+
+  <%# ── forms ── -%>
+  <div class="card mb-3"><div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Forms</h6>
+    <% if view.forms[:started].zero? && view.forms[:total_submits].zero? -%>
+      <p class="text-xs text-gray-400">No form activity recorded on this page.</p>
+    <% else -%>
+      <p class="text-xs text-gray-500 mb-2">
+        <%= view.forms[:started] %> session<%= view.forms[:started] == 1 ? "" : "s" %> started,
+        <%= view.forms[:completed] %> completed (<%= view.pct(view.forms[:completion_rate]) %>),
+        <%= view.forms[:total_submits] %> submit<%= view.forms[:total_submits] == 1 ? "" : "s" %> in total.
+        <span class="text-gray-400">Started/completed are per-session.</span>
+      </p>
+      <% unless view.forms[:fields].empty? -%>
+        <table class="w-full text-xs mb-2">
+          <thead><tr><th class="text-left py-1 text-gray-500">Field</th><th class="text-right py-1 text-gray-500">Sessions</th><th class="text-right py-1 text-gray-500">Avg fill</th><th class="text-right py-1 text-gray-500">Refills</th></tr></thead>
+          <tbody>
+            <% view.forms[:fields].each do |field| -%>
+              <tr>
+                <td class="py-1 font-mono">#<%= field[:field_id] %></td>
+                <td class="py-1 text-right tabular-nums text-gray-500"><%= field[:sessions] %></td>
+                <td class="py-1 text-right tabular-nums text-gray-500"><%= view.secs(field[:avg_time_to_fill_ms]) %></td>
+                <td class="py-1 text-right tabular-nums text-gray-500"><%= field[:total_refills] %></td>
+              </tr>
+            <% end -%>
+          </tbody>
+        </table>
+      <% end -%>
+      <% unless view.forms[:drop_off_fields].empty? -%>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1">Drop-off fields</div>
+        <table class="w-full text-xs">
+          <tbody>
+            <% view.forms[:drop_off_fields].each do |field| -%>
+              <tr><td class="py-1 font-mono">#<%= field[:field_id] %></td><td class="py-1 text-right tabular-nums text-gray-500"><%= field[:count] %></td></tr>
+            <% end -%>
+          </tbody>
+        </table>
+      <% end -%>
+    <% end -%>
+  </div></div>
+
+  <%# ── web vitals ── -%>
+  <div class="card mb-3"><div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Web Vitals</h6>
+    <% if view.report[:vitals][:sample_count].zero? -%>
+      <p class="text-xs text-gray-400">No Web Vitals recorded on this page.</p>
+    <% else -%>
+      <table class="w-full text-xs">
+        <thead><tr><th class="text-left py-1 text-gray-500">Metric</th><th class="text-right py-1 text-gray-500">p50</th><th class="text-right py-1 text-gray-500">p75</th><th class="text-right py-1 text-gray-500">p90</th><th class="text-right py-1 text-gray-500">n</th><th class="text-right py-1 text-gray-500">Slowest</th></tr></thead>
+        <tbody>
+          <% view.report[:vitals][:metrics].sort.each do |metric, m| -%>
+            <tr>
+              <td class="py-1 font-mono"><%= view.h(metric) %></td>
+              <td class="py-1 text-right tabular-nums"><%= view.h(view.format_vital(metric, m[:p50])) %></td>
+              <td class="py-1 text-right tabular-nums"><%= view.h(view.format_vital(metric, m[:p75])) %></td>
+              <td class="py-1 text-right tabular-nums"><%= view.h(view.format_vital(metric, m[:p90])) %></td>
+              <td class="py-1 text-right tabular-nums text-gray-400"><%= m[:samples] %></td>
+              <td class="py-1 text-right">
+                <% if m[:worst] -%>
+                  <a class="text-blue-600 hover:text-blue-800"
+                     href="<%= view.h(view.base_path) %>/sessions/<%= view.h(m[:worst][:session_id].to_s) %>/windows/<%= view.h(m[:worst][:window_id].to_s) %>?t=<%= m[:worst][:offset_ms].to_i %>">Open in player &rarr;</a>
+                <% else -%>
+                  <span class="text-gray-400">&mdash;</span>
+                <% end -%>
+              </td>
+            </tr>
+          <% end -%>
+        </tbody>
+      </table>
+    <% end -%>
+  </div></div>
+
+  <%# ── errors ── -%>
+  <div class="card mb-3"><div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Errors</h6>
+    <% if view.report[:errors][:total].zero? -%>
+      <p class="text-xs text-gray-400">No errors recorded on this page.</p>
+    <% else -%>
+      <p class="text-xs text-gray-500 mb-2"><%= view.report[:errors][:total] %> total.</p>
+      <% view.report[:errors][:groups].each do |group| -%>
+        <div class="mb-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="badge badge-danger"><%= group[:count] %></span>
+            <span class="text-xs font-mono text-gray-700 break-all"><%= view.h(group[:message]) %></span>
+          </div>
+          <table class="w-full text-xs">
+            <tbody>
+              <% group[:occurrences].each do |occ| -%>
+                <tr>
+                  <td class="py-1 text-gray-400 tabular-nums">+<%= (occ[:offset_ms].to_f / 1000).round(1) %>s</td>
+                  <td class="py-1 text-right">
+                    <a class="text-blue-600 hover:text-blue-800"
+                       href="<%= view.h(view.base_path) %>/sessions/<%= view.h(occ[:session_id].to_s) %>/windows/<%= view.h(occ[:window_id].to_s) %>?t=<%= occ[:offset_ms].to_i %>">Open in player &rarr;</a>
+                  </td>
+                </tr>
+              <% end -%>
+            </tbody>
+          </table>
+        </div>
+      <% end -%>
+    <% end -%>
+  </div></div>
+
+  <%# ── frustration ── -%>
+  <div class="card mb-3"><div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Frustration Signals</h6>
+    <% if view.frustration[:rage_count].zero? && view.frustration[:dead_count].zero? -%>
+      <p class="text-xs text-gray-400">No frustration signals recorded on this page.</p>
+    <% else -%>
+      <p class="text-xs text-gray-500 mb-1">
+        <% if view.frustration[:rage_count] > 0 -%>
+          <span class="badge badge-danger"><%= view.frustration[:rage_count] %></span> rage clicks,
+        <% else -%>
+          0 rage clicks,
+        <% end -%>
+        <% if view.frustration[:dead_count] > 0 -%>
+          <span class="badge badge-warning"><%= view.frustration[:dead_count] %></span>
+        <% else -%>
+          0
+        <% end -%>
+        dead clicks <span class="text-gray-400">(raw, pre-filter)</span>.
+      </p>
+      <p class="text-[10px] text-gray-400 mb-2">
+        The dead-click count here is the raw, pre-filter total and may exceed
+        the Frustration page, which applies an additional de-noise pass.
+      </p>
+      <% unless view.frustration[:top_selectors].empty? -%>
+        <table class="w-full text-xs">
+          <thead><tr><th class="text-left py-1 text-gray-500">Rage-clicked element</th><th class="text-right py-1 text-gray-500">Count</th></tr></thead>
+          <tbody>
+            <% view.frustration[:top_selectors].each do |el| -%>
+              <tr><td class="py-1 font-mono break-all"><%= view.h(el[:selector]) %></td><td class="py-1 text-right tabular-nums text-gray-500"><%= el[:count] %></td></tr>
+            <% end -%>
+          </tbody>
+        </table>
+      <% end -%>
+    <% end -%>
+  </div></div>
+
+  <%# ── custom events ── -%>
+  <div class="card mb-3"><div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Custom Events</h6>
+    <% if view.report[:custom_events].empty? -%>
+      <p class="text-xs text-gray-400">No custom events recorded on this page.</p>
+    <% else -%>
+      <table class="w-full text-xs">
+        <thead><tr><th class="text-left py-1 text-gray-500">Tag</th><th class="text-right py-1 text-gray-500">Count</th></tr></thead>
+        <tbody>
+          <% view.report[:custom_events].each do |ev| -%>
+            <tr><td class="py-1 font-mono break-all"><%= view.h(ev[:tag]) %></td><td class="py-1 text-right tabular-nums text-gray-500"><%= ev[:count] %></td></tr>
+          <% end -%>
+        </tbody>
+      </table>
+    <% end -%>
+  </div></div>
+<% end -%>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>

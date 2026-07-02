@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# Boot the Sentiero demo app for Playwright end-to-end tests.
+#
+# - Builds the frontend bundle if the asset manifest is missing.
+# - Installs demo gem dependencies.
+# - Wipes the file store so each run starts from an empty, deterministic state.
+# - Launches puma on :9393 with REDIS_URL unset so the demo uses the File
+#   store (demo/tmp/sentiero_sessions) rather than Redis.
+#
+# Paths are resolved from this script's location so it works regardless of cwd.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+E2E_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd "$E2E_DIR/.." && pwd)"
+PORT="${PORT:-9393}"
+
+echo "==> e2e serve: repo root = $REPO_ROOT"
+
+# 1. Build the frontend bundle if the manifest is missing.
+if [ ! -f "$REPO_ROOT/lib/sentiero/web/assets/manifest.json" ]; then
+  echo "==> Asset manifest missing,  building frontend..."
+  (cd "$REPO_ROOT/frontend" && npm ci && npm run build)
+else
+  echo "==> Asset manifest present,  skipping frontend build."
+fi
+
+# 2. Install demo dependencies.
+echo "==> Installing demo dependencies..."
+(cd "$REPO_ROOT/demo" && bundle install --quiet)
+
+# 3. Start from a clean file store.
+STORE_DIR="$REPO_ROOT/demo/tmp/sentiero_sessions"
+echo "==> Clearing file store: $STORE_DIR"
+rm -rf "$STORE_DIR"
+
+# 4. Launch puma with REDIS_URL unset so the demo uses the File store.
+#    (The demo loads REDIS_URL from demo/.env via dotenv and would otherwise
+#    try to reach an unreachable Redis and fall back; unsetting it keeps the
+#    path deterministic. Note: dotenv does not override already-set vars but
+#    will set unset ones, so the demo still rescues to the file store either
+#    way. We make REDIS_URL empty AND remove it from the environment.)
+echo "==> Starting puma on port $PORT (File store, REDIS_URL unset)..."
+cd "$REPO_ROOT/demo"
+exec env -u REDIS_URL PORT="$PORT" bundle exec puma -p "$PORT" -b "tcp://127.0.0.1"

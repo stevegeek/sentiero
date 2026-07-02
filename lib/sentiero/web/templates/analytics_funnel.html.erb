@@ -1,0 +1,103 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :funnel, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Funnel</h1>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics/funnel" class="flex items-end gap-2">
+    <% 3.times do |i| -%>
+      <div class="shrink-0">
+        <label for="step<%= i + 1 %>" class="label">Step <%= i + 1 %><%= (i == 2) ? " (optional)" : "" %></label>
+        <select name="step<%= i + 1 %>" id="step<%= i + 1 %>" class="select" style="width:10rem">
+          <option value="">&mdash;</option>
+          <% view.tags.each do |tag| -%>
+            <option value="<%= view.h(tag) %>" <%= (view.selected_steps[i] == tag) ? "selected" : "" %>><%= view.h(tag) %></option>
+          <% end -%>
+        </select>
+      </div>
+    <% end -%>
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+  </form>
+</div>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "sessions") %>
+
+<% if view.steps.empty? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      Pick at least two steps to build a funnel. Steps are the custom-event
+      tags your site records via <code class="font-mono">Sentiero.track(tag)</code>;
+      a session converts a step only when it fires <em>after</em> the previous one.
+    </div>
+  </div>
+<% elsif view.step_one_sessions == 0 -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      No sessions performed the first step
+      (<code class="font-mono"><%= view.h(view.steps.first[:tag]) %></code>) in this range.
+    </div>
+  </div>
+<% else -%>
+  <p class="text-xs text-gray-500 mb-3">
+    Steps must occur in order within a session (each strictly after the
+    previous). Conversion is relative to step 1; times are the median gap
+    from the previous step across converting sessions.
+  </p>
+
+  <% view.steps.each_with_index do |step, i| -%>
+    <div class="card mb-3" data-funnel-step="<%= i + 1 %>">
+      <div class="card-body">
+        <div class="flex items-center gap-3 mb-2">
+          <span class="badge badge-neutral shrink-0"><%= i + 1 %></span>
+          <span class="text-sm font-medium text-gray-900 font-mono break-all"><%= view.h(step[:tag]) %></span>
+          <span class="text-xs text-gray-500 tabular-nums ml-auto shrink-0">
+            <span data-step-sessions="<%= step[:sessions] %>"><%= step[:sessions] %> session<%= step[:sessions] == 1 ? "" : "s" %></span>
+            <% if step[:conversion_pct] -%>
+              &middot; <span data-conversion-pct="<%= step[:conversion_pct] %>"><%= step[:conversion_pct] %>%</span>
+            <% end -%>
+            <% if step[:median_ms_from_previous] -%>
+              &middot; median <%= view.h(view.format_gap(step[:median_ms_from_previous])) %> after step <%= i %>
+            <% end -%>
+          </span>
+        </div>
+
+        <div class="bg-gray-100 rounded h-4 overflow-hidden">
+          <div class="bg-blue-500 h-4 rounded" style="width: <%= view.step_one_sessions.zero? ? 0 : (step[:sessions].to_f / view.step_one_sessions * 100).round(1) %>%"></div>
+        </div>
+
+        <% if view.next_step(i) && view.dropped(i) > 0 -%>
+          <div class="mt-3">
+            <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">
+              <%= view.dropped(i) %> dropped off before
+              <code class="font-mono normal-case"><%= view.h(view.next_step(i)[:tag]) %></code>
+            </div>
+            <% unless step[:drop_off_examples].empty? -%>
+              <table class="w-full text-xs">
+                <tbody>
+                  <% step[:drop_off_examples].each do |example| -%>
+                    <tr>
+                      <td class="py-1 font-mono text-gray-500"><%= view.h(example[:session_id].to_s[0, 16]) %></td>
+                      <td class="py-1 text-gray-400 tabular-nums">+<%= (example[:offset_ms].to_f / 1000).round(1) %>s</td>
+                      <td class="py-1 text-right">
+                        <a class="text-blue-600 hover:text-blue-800"
+                           href="<%= view.h(view.base_path) %>/sessions/<%= view.h(example[:session_id].to_s) %>/windows/<%= view.h(example[:window_id].to_s) %>?t=<%= example[:offset_ms].to_i %>">Open in player &rarr;</a>
+                      </td>
+                    </tr>
+                  <% end -%>
+                </tbody>
+              </table>
+              <% if view.dropped(i) > step[:drop_off_examples].size -%>
+                <p class="text-[10px] text-gray-400 mt-1">
+                  Showing the first <%= step[:drop_off_examples].size %> of <%= view.dropped(i) %> drop-offs.
+                </p>
+              <% end -%>
+            <% end -%>
+          </div>
+        <% end -%>
+      </div>
+    </div>
+  <% end -%>
+<% end -%>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>

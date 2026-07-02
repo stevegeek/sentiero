@@ -1,0 +1,135 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :frustration, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Frustration Signals</h1>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics/frustration" class="flex items-end gap-2">
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+  </form>
+</div>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "incidents") %>
+
+<% if view.sorted_pages.empty? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      No frustration signals detected yet. Rage clicks are bursts of 3+ clicks
+      at the same spot within 500ms; dead clicks get no page response within 500ms.
+    </div>
+  </div>
+<% else -%>
+  <p class="text-xs text-gray-500 mb-3">
+    <strong>Rage clicks</strong> are bursts of 3+ clicks at the same spot within
+    500ms; <strong>dead clicks</strong> are clicks the page never responds to
+    within 500ms. Element attribution needs the recorder&rsquo;s
+    <code class="font-mono">capture_clicks</code> annotations.
+  </p>
+
+  <div class="table-wrap mb-4">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Page</th>
+          <th class="text-right">Rage clicks</th>
+          <th class="text-right">Dead clicks</th>
+          <th class="text-right">Sessions affected</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% view.sorted_pages.each do |url, page| -%>
+          <tr>
+            <td class="break-words max-w-xs"><%= view.h(url) %></td>
+            <td class="text-right tabular-nums">
+              <% if page[:rage_count] > 0 -%>
+                <span class="badge badge-danger"><%= page[:rage_count] %></span>
+              <% else -%>
+                <span class="text-gray-400">0</span>
+              <% end -%>
+            </td>
+            <td class="text-right tabular-nums">
+              <% if page[:dead_count] > 0 -%>
+                <span class="badge badge-warning"><%= page[:dead_count] %></span>
+              <% else -%>
+                <span class="text-gray-400">0</span>
+              <% end -%>
+            </td>
+            <td class="text-right tabular-nums"><%= page[:sessions_affected] %></td>
+          </tr>
+        <% end -%>
+      </tbody>
+    </table>
+  </div>
+
+  <% view.sorted_pages.each do |url, page| -%>
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="text-sm font-medium text-gray-900 break-words mb-3"><%= view.h(url) %></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Top Rage-Clicked Elements</h6>
+            <% if page[:top_selectors].empty? -%>
+              <p class="text-xs text-gray-400">No selector-attributed rage clicks.</p>
+            <% else -%>
+              <table class="w-full text-xs">
+                <tbody>
+                  <% page[:top_selectors].each do |element| -%>
+                    <tr>
+                      <td class="py-1 font-mono break-all"><%= view.h(element[:selector]) %></td>
+                      <td class="py-1 text-right tabular-nums text-gray-500"><%= element[:count] %></td>
+                    </tr>
+                  <% end -%>
+                </tbody>
+              </table>
+            <% end -%>
+          </div>
+
+          <div>
+            <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Incidents</h6>
+            <table class="w-full text-xs">
+              <tbody>
+                <% page[:incidents].each do |incident| -%>
+                  <tr>
+                    <td class="py-1">
+                      <% if incident[:subtype] == "rage_click" -%>
+                        <span class="badge badge-danger">rage &times;<%= incident[:count].to_i %></span>
+                        <% if incident[:selector] -%>
+                          <span class="font-mono text-gray-500 ml-1"><%= view.h(incident[:selector]) %></span>
+                        <% end -%>
+                      <% elsif incident[:kind] == "error" -%>
+                        <%# C4: the A4 analyzer tags dead clicks whose response
+                            window contains a JS error custom — the page
+                            crashed instead of responding. Older incident
+                            shapes without :kind fall through to plain dead. -%>
+                        <a href="<%= view.h(view.base_path) %>/issues?source=client"
+                           class="badge badge-danger" data-incident-kind="error"
+                           title="A JS error fired within this click's response window — open client JS errors">dead + JS error</a>
+                      <% else -%>
+                        <span class="badge badge-warning">dead</span>
+                      <% end -%>
+                    </td>
+                    <td class="py-1 text-gray-400 tabular-nums">+<%= (incident[:offset_ms].to_f / 1000).round(1) %>s</td>
+                    <td class="py-1 text-right">
+                      <a class="text-blue-600 hover:text-blue-800"
+                         href="<%= view.h(view.base_path) %>/sessions/<%= view.h(incident[:session_id].to_s) %>/windows/<%= view.h(incident[:window_id].to_s) %>?t=<%= incident[:offset_ms].to_i %>">Open in player &rarr;</a>
+                    </td>
+                  </tr>
+                <% end -%>
+              </tbody>
+            </table>
+            <% if page[:rage_count] + page[:dead_count] > page[:incidents].size -%>
+              <p class="text-[10px] text-gray-400 mt-2">
+                Showing the first <%= page[:incidents].size %> of
+                <%= page[:rage_count] + page[:dead_count] %> incidents.
+              </p>
+            <% end -%>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end -%>
+<% end -%>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>

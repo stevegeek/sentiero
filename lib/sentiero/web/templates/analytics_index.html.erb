@@ -1,0 +1,380 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :overview, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Analytics</h1>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics" class="flex items-end gap-2">
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <div class="shrink-0">
+      <label for="range" class="label">Preset</label>
+      <select name="range" id="range" class="select" style="width:8rem" data-analytics-range>
+        <% if view.custom_range -%>
+          <option value="" selected>Custom</option>
+        <% end -%>
+        <% view.allowed_ranges.each do |r| -%>
+          <option value="<%= r %>" <%= (!view.custom_range && r == view.range_days) ? "selected" : "" %>>Last <%= r %> days</option>
+        <% end -%>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-sm btn-secondary" data-analytics-apply>Apply</button>
+  </form>
+<script src="<%= view.built_asset('analytics') %>" defer></script>
+</div>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.stats[:was_truncated], noun: "figures", scanned: view.stats[:sessions_scanned]) %>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+  <div class="card">
+    <div class="px-5 py-4">
+      <div class="text-2xl font-bold text-gray-900 tracking-tight"><%= view.stats[:total_sessions] %></div>
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Total Sessions
+        <%= view.render_delta(view.deltas && view.deltas[:sessions], "delta-sessions", "%") %>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="px-5 py-4">
+      <div class="text-2xl font-bold text-gray-900 tracking-tight"><%= view.stats[:total_events] %></div>
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Total Events
+        <%= view.render_delta(view.deltas && view.deltas[:events], "delta-events", "%") %>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="px-5 py-4">
+      <div class="text-2xl font-bold text-gray-900 tracking-tight"><%= view.stats[:avg_duration_ms] ? view.h(view.format_duration(0, view.stats[:avg_duration_ms])) : "N/A" %></div>
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Avg Duration</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+  <a href="<%= view.h(view.base_path) %>/issues" class="card hover:bg-gray-50 transition-colors">
+    <div class="px-5 py-4">
+      <div class="text-2xl font-bold text-gray-900 tracking-tight"><%= view.stats[:open_problems] %></div>
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Open Problems</div>
+    </div>
+  </a>
+  <a href="<%= view.h(view.base_path) %>/?has_errors=true<%= view.h(view.range_qs) %>" class="card hover:bg-gray-50 transition-colors">
+    <div class="px-5 py-4">
+      <div class="text-2xl font-bold text-gray-900 tracking-tight"><%= view.stats[:sessions_with_errors] %></div>
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Sessions with Errors</div>
+    </div>
+  </a>
+  <%# B5: 1 - errored/total as the crash-free-style KPI; N/A when no sessions. -%>
+  <a href="<%= view.h(view.base_path) %>/?has_errors=true<%= view.h(view.range_qs) %>" class="card hover:bg-gray-50 transition-colors">
+    <div class="px-5 py-4">
+      <div class="text-2xl font-bold text-gray-900 tracking-tight">
+        <% total_sessions = view.stats[:total_sessions] -%>
+        <%= (total_sessions > 0) ? "#{((1 - view.stats[:sessions_with_errors].to_f / total_sessions) * 100).round(1)}%" : "N/A" %>
+      </div>
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Error-Free Sessions
+        <%= view.render_delta(view.deltas && view.deltas[:error_free_rate], "delta-error-free", "pp") %>
+      </div>
+    </div>
+  </a>
+</div>
+
+<% top_problems = view.stats[:top_problems] || [] -%>
+<% unless top_problems.empty? -%>
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Top Problems
+        <span class="font-normal normal-case tracking-normal text-gray-400">&mdash; open, by occurrence count</span>
+      </h6>
+      <table class="w-full text-xs">
+        <% top_problems.each do |p| -%>
+          <tr class="border-b border-gray-100 last:border-0">
+            <td class="py-1 text-gray-700 truncate max-w-0 w-full">
+              <a href="<%= view.h(view.base_path) %>/issues/<%= view.h(p[:id].to_s) %>" class="text-blue-600 hover:text-blue-800">
+                <span class="text-gray-500"><%= view.h(p[:exception_class].to_s) %></span>
+                <%= view.h(p[:message].to_s[0, 120]) %>
+              </a>
+              <% if p[:new] -%>
+                <span class="badge badge-info">new</span>
+              <% end -%>
+            </td>
+            <td class="py-1 pl-2 text-right text-gray-500 tabular-nums"><%= p[:count] %></td>
+          </tr>
+        <% end -%>
+      </table>
+    </div>
+  </div>
+<% end -%>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider">Events per <%= (view.stats[:series_bucket] == "week") ? "Week" : "Day" %>
+      <span class="font-normal normal-case tracking-normal text-gray-400">&mdash;
+        <% if view.custom_range -%>
+          <%= view.h(view.since.empty? ? "start" : view.since) %> &rarr; <%= view.h(view.until_str.empty? ? "today" : view.until_str) %>
+        <% else -%>
+          Last <%= view.range_days %> Days
+        <% end -%>
+      </span>
+    </h6>
+
+    <% if view.max_events == 0 -%>
+      <p class="text-gray-400 text-xs py-6 text-center">No events in this range.</p>
+    <% else -%>
+      <div class="stats-chart">
+        <% view.series.each do |day| -%>
+          <% error_count = day[:error_count].to_i -%>
+          <% server_count = day[:server_error_count].to_i -%>
+          <div class="stats-chart-col">
+            <div class="stats-chart-bar-wrapper">
+              <% height_pct = (day[:event_count].to_f / view.max_events * 100).round -%>
+              <div class="stats-chart-bar" style="height: <%= height_pct %>%" title="<%= view.h(day[:date]) %>: <%= day[:event_count] %> events, <%= day[:session_count] %> sessions, <%= error_count %> JS errors">
+                <% if day[:event_count] > 0 -%>
+                  <span class="stats-chart-value"><%= day[:event_count] %></span>
+                <% end -%>
+              </div>
+              <%# C6(a): the session count as a visible thin companion bar. -%>
+              <% if view.max_sessions > 0 && day[:session_count] > 0 -%>
+                <div data-session-count="<%= day[:session_count] %>"
+                  title="<%= view.h(day[:date]) %>: <%= day[:session_count] %> session<%= day[:session_count] == 1 ? "" : "s" %>"
+                  style="width:14%;max-width:8px;min-height:2px;height:<%= (day[:session_count].to_f / view.max_sessions * 100).round %>%;background:#7c3aed;border-radius:2px 2px 0 0;margin-left:2px"></div>
+              <% end -%>
+            </div>
+            <%# C6(b): per-day error annotations — client JS errors (amber) and
+                server exceptions (red) side by side, visually distinct. -%>
+            <% if error_count > 0 || server_count > 0 -%>
+              <div class="text-center" style="font-size:9px;line-height:1.2">
+                <% if error_count > 0 -%>
+                  <span data-error-count="<%= error_count %>" style="color:#d97706" title="<%= error_count %> JS error<%= error_count == 1 ? "" : "s" %> on <%= view.h(day[:date]) %>">&#x26a0; <%= error_count %></span>
+                <% end -%>
+                <% if server_count > 0 -%>
+                  <span data-server-error-count="<%= server_count %>" style="color:#dc2626" title="<%= server_count %> server exception<%= server_count == 1 ? "" : "s" %> on <%= view.h(day[:date]) %>">&#x26a0; <%= server_count %></span>
+                <% end -%>
+              </div>
+            <% end -%>
+            <%# Day buckets are "YYYY-MM-DD" (shown as MM-DD); week buckets are "YYYY-Wnn" (shown as Wnn). -%>
+            <div class="stats-chart-label"><%= view.h(day[:date].include?("W") ? day[:date].split("-", 2).last : day[:date][-5..]) %></div>
+          </div>
+        <% end -%>
+      </div>
+      <div class="text-[10px] text-gray-400 mt-2">
+        <span style="color:#2563eb">&#9632;</span> events &middot;
+        <span style="color:#7c3aed">&#9632;</span> sessions &middot;
+        <span style="color:#d97706">&#x26a0;</span> JS errors &middot;
+        <span style="color:#dc2626">&#x26a0;</span> server exceptions
+      </div>
+    <% end -%>
+    <% if view.stats[:server_overlay_truncated] -%>
+      <div class="text-[10px] mt-1" style="color:#d97706">
+        Server-exception overlay truncated (problem/occurrence caps hit); daily counts are a lower bound.
+      </div>
+    <% end -%>
+    <div class="mt-3 text-right">
+      <a href="<%= view.h(view.base_path) %>/issues?source=client<%= view.h(view.range_qs) %>" class="btn btn-sm btn-secondary">View all JS errors &rarr;</a>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+  <% view.distributions.each do |title, counts, empty_message| -%>
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3"><%= view.h(title) %></h6>
+        <% if counts.empty? -%>
+          <p class="text-gray-400 text-xs py-4 text-center"><%= view.h(empty_message) %></p>
+        <% else -%>
+          <% bar_max = counts.values.max -%>
+          <% counts.each do |label, count| -%>
+            <div class="flex items-center gap-2 mb-1.5">
+              <div class="text-xs text-gray-700 w-20 shrink-0 truncate"><%= view.h(label) %></div>
+              <div class="flex-1 bg-gray-100 rounded h-3 overflow-hidden">
+                <div class="bg-blue-500 h-3 rounded" style="width: <%= (count.to_f / bar_max * 100).round %>%"></div>
+              </div>
+              <div class="text-xs text-gray-500 w-8 text-right tabular-nums"><%= count %></div>
+            </div>
+          <% end -%>
+        <% end -%>
+      </div>
+    </div>
+  <% end -%>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+  <div class="card">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Session Duration</h6>
+      <% if view.bucket_total == 0 -%>
+        <p class="text-gray-400 text-xs py-4 text-center">No sessions with measurable duration.</p>
+      <% else -%>
+        <div class="flex items-center gap-4">
+          <%
+            # Hand-rolled donut: each slice is a stroke-dasharray arc on a circle.
+            offset = 0.0
+          -%>
+          <svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Session duration distribution">
+            <g transform="rotate(-90 60 60)">
+              <% view.buckets.each_with_index do |(label, count), i| -%>
+                <% next if count == 0 -%>
+                <% fraction = count.to_f / view.bucket_total -%>
+                <% dash = (fraction * view.donut_circumference).round(2) -%>
+                <circle cx="60" cy="60" r="<%= view.donut_radius %>" fill="none"
+                  stroke="<%= view.bucket_colors[i % view.bucket_colors.size] %>" stroke-width="16"
+                  stroke-dasharray="<%= dash %> <%= (view.donut_circumference - dash).round(2) %>"
+                  stroke-dashoffset="<%= (-offset).round(2) %>"></circle>
+                <% offset += dash -%>
+              <% end -%>
+            </g>
+          </svg>
+          <div class="flex-1">
+            <% view.buckets.each_with_index do |(label, count), i| -%>
+              <div class="flex items-center gap-2 mb-1 text-xs">
+                <span class="inline-block w-3 h-3 rounded-sm shrink-0" style="background: <%= view.bucket_colors[i % view.bucket_colors.size] %>"></span>
+                <span class="text-gray-700 w-16"><%= view.h(label) %></span>
+                <span class="text-gray-500 tabular-nums"><%= count %></span>
+              </div>
+            <% end -%>
+          </div>
+        </div>
+      <% end -%>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Custom Event Tags</h6>
+      <% if view.custom_tags.empty? -%>
+        <p class="text-gray-400 text-xs py-4 text-center">No custom events.</p>
+      <% else -%>
+        <table class="w-full text-xs">
+          <% view.custom_tags.each do |tag, count| -%>
+            <tr class="border-b border-gray-100 last:border-0">
+              <td class="py-1 text-gray-700">
+                <a href="<%= view.h(view.tag_href(tag)) %>" class="text-blue-600 hover:text-blue-800"><%= view.h(tag) %></a>
+              </td>
+              <td class="py-1 pl-2">
+                <%# C5: tiny per-bucket sparkline, aligned with the overview chart's buckets. %>
+                <% if view.tag_series_max(tag) > 0 -%>
+                  <div class="flex items-end ml-auto" style="gap:1px;height:16px;width:6rem" data-tag-series="<%= view.h(tag) %>">
+                    <% view.tag_day_series(tag).each do |day| -%>
+                      <div class="flex-1" style="height:<%= [(day[:count].to_f / view.tag_series_max(tag) * 16).round, 1].max %>px;background:<%= day[:count].zero? ? "#f3f4f6" : "#93c5fd" %>" title="<%= view.h(day[:date]) %>: <%= day[:count] %>"></div>
+                    <% end -%>
+                  </div>
+                <% end -%>
+              </td>
+              <td class="py-1 pl-2 text-right text-gray-500 tabular-nums"><%= count %></td>
+            </tr>
+          <% end -%>
+        </table>
+      <% end -%>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+  <div class="card">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-1">Top Entry Pages</h6>
+      <%# C2 (P2.2): one-line method note so "entry" can't be misread. -%>
+      <div class="text-[10px] text-gray-400 mb-2">Entry = first page seen in the recording.</div>
+      <% pages = view.stats[:top_entry_pages] || [] -%>
+      <% if pages.empty? -%>
+        <p class="text-gray-400 text-xs py-4 text-center">No entry-page data.</p>
+      <% else -%>
+        <table class="w-full text-xs">
+          <tr class="border-b border-gray-100">
+            <th class="py-1 text-left text-[10px] font-medium text-gray-400 uppercase tracking-wider">Page</th>
+            <th class="py-1 pl-2 text-right text-[10px] font-medium text-gray-400 uppercase tracking-wider">Sessions</th>
+            <th class="py-1 pl-2 text-right text-[10px] font-medium text-gray-400 uppercase tracking-wider">Err %</th>
+          </tr>
+          <% pages.each do |row| -%>
+            <tr class="border-b border-gray-100 last:border-0">
+              <td class="py-1 text-gray-700 truncate max-w-0 w-full">
+                <a href="<%= view.h(view.seg_href(row)) %>" class="text-blue-600 hover:text-blue-800" title="Open errored sessions entering on this page"><%= view.h(row[:url]) %></a>
+              </td>
+              <td class="py-1 pl-2 text-right text-gray-500 tabular-nums"><%= row[:count] %></td>
+              <td class="py-1 pl-2 text-right tabular-nums <%= (view.err_pct(row) > 0) ? "text-red-600" : "text-gray-400" %>" data-entry-err-pct="<%= view.err_pct(row) %>"><%= view.err_pct(row) %>%</td>
+            </tr>
+          <% end -%>
+        </table>
+        <div class="text-[10px] text-gray-400 mt-1">Err % = sessions entering on this page that hit an error anywhere in the session (entry-page correlation, not the page the error fired on).</div>
+      <% end -%>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Top Referrers</h6>
+      <% referrers = view.stats[:top_referrers] || [] -%>
+      <% if referrers.empty? -%>
+        <p class="text-gray-400 text-xs py-4 text-center">No referrer data.</p>
+      <% else -%>
+        <table class="w-full text-xs">
+          <% referrers.each do |row| -%>
+            <tr class="border-b border-gray-100 last:border-0">
+              <td class="py-1 text-gray-700 truncate max-w-0 w-full"><%= view.h(row[:referrer]) %></td>
+              <td class="py-1 pl-2 text-right text-gray-500 tabular-nums"><%= row[:count] %></td>
+            </tr>
+          <% end -%>
+        </table>
+      <% end -%>
+    </div>
+  </div>
+</div>
+
+<%# B8 + B9: navigation destinations and custom-metadata discovery panels. -%>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+  <div class="card">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Navigation Clicks</h6>
+      <% nav = view.stats[:navigation] || {} -%>
+      <% if view.nav_sections(nav).all? { |_title, rows| rows.empty? } -%>
+        <p class="text-gray-400 text-xs py-4 text-center">No navigation clicks recorded (enable trackNavigation).</p>
+      <% else -%>
+        <% view.nav_sections(nav).each do |title, rows| -%>
+          <% next if rows.empty? -%>
+          <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5"><%= view.h(title) %></div>
+          <table class="w-full text-xs mb-3">
+            <% rows.each do |row| -%>
+              <tr class="border-b border-gray-100 last:border-0">
+                <td class="py-1 text-gray-700 truncate max-w-0 w-full"><%= view.h(row[:url]) %></td>
+                <td class="py-1 pl-2 text-right text-gray-500 tabular-nums"><%= row[:count] %></td>
+              </tr>
+            <% end -%>
+          </table>
+        <% end -%>
+        <% texts = nav[:top_texts] || [] -%>
+        <% unless texts.empty? -%>
+          <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">Top link text</div>
+          <div class="flex items-center gap-1 flex-wrap">
+            <% texts.first(8).each do |row| -%>
+              <span class="badge badge-neutral"><%= view.h(row[:text]) %>&nbsp;<span class="tabular-nums">&times;<%= row[:count] %></span></span>
+            <% end -%>
+          </div>
+        <% end -%>
+      <% end -%>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Session Metadata</h6>
+      <% meta_dist = view.stats[:metadata_distributions] || [] -%>
+      <% if meta_dist.empty? -%>
+        <p class="text-gray-400 text-xs py-4 text-center">No custom metadata recorded (use Sentiero.setMetadata).</p>
+      <% else -%>
+        <% meta_dist.each do |entry| -%>
+          <div class="mb-3">
+            <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">
+              <a href="<%= view.h("#{view.base_path}/analytics/segments?" + Rack::Utils.build_query({"metadata_key" => entry[:key]})) %>" class="text-blue-600 hover:text-blue-800"><%= view.h(entry[:key]) %></a>
+              <span class="normal-case tracking-normal">&middot; <%= entry[:count] %> session<%= entry[:count] == 1 ? "" : "s" %></span>
+            </div>
+            <div class="flex items-center gap-1 flex-wrap">
+              <% entry[:values].each do |val| -%>
+                <a href="<%= view.h("#{view.base_path}/analytics/segments?" + Rack::Utils.build_query({"metadata_key" => entry[:key], "metadata_value" => val[:value]})) %>" class="badge badge-neutral hover:bg-gray-50"><%= view.h(val[:value]) %>&nbsp;<span class="tabular-nums">&times;<%= val[:count] %></span></a>
+              <% end -%>
+            </div>
+          </div>
+        <% end -%>
+      <% end -%>
+    </div>
+  </div>
+</div>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/" class="btn btn-sm btn-secondary">&larr; Back to Sessions</a>
+</div>

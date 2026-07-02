@@ -1,0 +1,25 @@
+<form method="get" action="<%= view.h(view.base_path) %>/issues">
+  <input type="hidden" name="source" value="client">
+  <div class="card mb-4">
+    <div class="flex flex-wrap items-end gap-3 px-4 py-3">
+      <div class="shrink-0">
+        <label for="search" class="label">Search</label>
+        <input type="text" name="search" id="search" class="input w-56"
+               value="<%= view.h(search) %>" placeholder="Error message…">
+      </div>
+      <div class="shrink-0">
+        <label for="sort_by" class="label">Sort by</label>
+        <select name="sort_by" id="sort_by" class="select w-36">
+          <option value="count"   <%= "selected" if sort_by == "count" %>>Count</option>
+          <option value="recency" <%= "selected" if sort_by == "recency" %>>Recency</option>
+        </select>
+      </div>
+      <%= view.render_partial("_date_range.html.erb", since: since_param, until_str: until_param) %>
+      <div class="shrink-0 flex items-center gap-1.5">
+        <input type="hidden" name="per_page" value="<%= per_page %>">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="<%= view.h(view.base_path) %>/issues?source=client" class="btn btn-secondary">Clear</a>
+      </div>
+    </div>
+  </div>
+</form>

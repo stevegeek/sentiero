@@ -1,0 +1,149 @@
+<h1 class="page-title mb-1">Errors</h1>
+<%= view.render_partial("_tabs.html.erb", tabs: [
+  {label: "Server exceptions", href: "#{view.base_path}/issues", active: view.source == "server"},
+  {label: "Client JS errors", href: "#{view.base_path}/issues?source=client", active: view.source == "client"}
+]) %>
+
+<% if view.source == "client" -%>
+  <%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "entries") %>
+
+  <%= view.render_partial("_errors_client_filter.html.erb", search: view.search, sort_by: view.sort_by, per_page: view.per_page,
+    since_param: view.since_param, until_param: view.until_param) %>
+
+  <% if view.groups.empty? -%>
+    <div class="card"><div class="text-center py-10 px-6 text-gray-400 text-xs">
+      <% if !view.search.empty? -%>
+        No results match your filters.
+        <a href="<%= view.h(view.base_path) %>/issues?source=client" class="text-blue-600 hover:text-blue-800">Clear filters</a>
+      <% else -%>
+        No client JS errors captured yet.
+        <%= view.render_partial("_sibling_tab_hint.html.erb",
+          sibling: view.sibling, noun: "server exception", href: "#{view.base_path}/issues") %>
+      <% end -%>
+    </div></div>
+  <% else -%>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Error</th><th class="w-24">Browser</th><th class="w-20">Count</th><th class="w-32">Last seen</th></tr></thead>
+        <tbody>
+          <% view.groups.each do |group| -%>
+            <tr>
+              <td>
+                <a href="<%= view.h(view.base_path) %>/issues/client/<%= view.h(group[:id]) %>" class="block font-medium text-blue-600 hover:text-blue-800 break-words"><%= view.h(group[:message]) %></a>
+                <span class="block text-[11px] text-gray-400 mt-0.5">
+                  <% if group[:source] -%>
+                    <span class="font-mono"><%= view.h(group[:source]) %><%= group[:line] ? ":#{group[:line]}" : "" %></span>
+                  <% else -%>Unknown source<% end -%>
+                  · <%= group[:count] %> occurrence<%= group[:count] == 1 ? "" : "s" %>
+                </span>
+              </td>
+              <td class="text-xs text-gray-600">
+                <% browsers = group[:browsers] || {} -%>
+                <% dominant = browsers.max_by { |_browser, count| count } -%>
+                <% if dominant -%>
+                  <span data-dominant-browser="<%= view.h(dominant.first) %>"><%= view.h(dominant.first) %></span>
+                  <% if browsers.size > 1 -%>
+                    <span class="text-gray-400" data-browser-others="<%= browsers.size - 1 %>">+<%= browsers.size - 1 %></span>
+                  <% end -%>
+                <% else -%>
+                  <span class="text-gray-400">&mdash;</span>
+                <% end -%>
+              </td>
+              <td><span class="badge badge-danger tabular-nums"><%= group[:count] %>&times;</span></td>
+              <td class="text-gray-400 text-[10px] tabular-nums">
+                <%= group[:last_seen_at] ? Time.at(group[:last_seen_at].to_f / 1000).utc.strftime("%b %d, %H:%M") : "—" %>
+              </td>
+            </tr>
+          <% end -%>
+        </tbody>
+      </table>
+    </div>
+
+    <%= view.render_partial("_pagination.html.erb",
+      base_href: "#{view.base_path}/issues", page: view.page, has_next: view.has_next,
+      params: {"source" => "client", "search" => view.search, "sort_by" => view.sort_by,
+               "since" => view.since_param, "until" => view.until_param, "per_page" => view.per_page.to_s}) %>
+  <% end -%>
+<% else -%>
+  <%= view.render_partial("_errors_server_filter.html.erb", search: view.search, status: view.status, sort_by: view.sort_by, per_page: view.per_page,
+    since_param: view.since_param, until_param: view.until_param) %>
+
+  <% if view.problems.empty? -%>
+    <div class="card"><div class="text-center py-10 px-6 text-gray-400 text-xs">
+      <% if !view.search.empty? || !view.status.empty? || !view.since_param.empty? || !view.until_param.empty? -%>
+        No results match your filters.
+        <a href="<%= view.h(view.base_path) %>/issues" class="text-blue-600 hover:text-blue-800">Clear filters</a>
+      <% else -%>
+        No problems recorded yet.
+        <%= view.render_partial("_sibling_tab_hint.html.erb",
+          sibling: view.sibling, noun: "client JS error", href: "#{view.base_path}/issues?source=client") %>
+      <% end -%>
+    </div></div>
+  <% else -%>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Project</th>
+            <th>Count</th>
+            <th>Status</th>
+            <th>First Seen</th>
+            <th>Last Seen</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% view.problems.each do |p| -%>
+            <tr>
+              <td>
+                <a href="<%= view.h(view.base_path) %>/issues/<%= view.h(p[:id]) %>" class="font-medium text-blue-600 hover:text-blue-800">
+                  <span class="text-gray-500 text-xs mr-1"><%= view.h(p[:exception_class]) %></span>
+                  <%= view.h(p[:message].to_s[0, 120]) %>
+                </a>
+                <% if view.new_since && p[:first_seen] && p[:first_seen] >= view.new_since -%>
+                  <span class="badge badge-info">new</span>
+                <% end -%>
+              </td>
+              <td class="text-gray-500 text-xs"><%= view.h(p[:project].to_s) %></td>
+              <td>
+                <span class="badge badge-neutral tabular-nums"><%= p[:count] %></span>
+              </td>
+              <td>
+                <% case p[:status]
+                   when "resolved" -%>
+                  <span class="badge badge-success">resolved</span>
+                <% when "ignored" -%>
+                  <span class="badge badge-neutral">ignored</span>
+                <% else -%>
+                  <span class="badge badge-danger">open</span>
+                <% end -%>
+              </td>
+              <td class="text-gray-400 text-[10px]"><%= p[:first_seen] ? Time.at(p[:first_seen]).utc.strftime("%b %d, %H:%M") : "N/A" %></td>
+              <td class="text-gray-400 text-[10px]"><%= p[:last_seen] ? Time.at(p[:last_seen]).utc.strftime("%b %d, %H:%M") : "N/A" %></td>
+              <td class="text-right">
+                <form method="post" action="<%= view.h(view.base_path) %>/issues/<%= view.h(p[:id]) %>/status" class="inline-flex gap-1">
+                  <input type="hidden" name="csrf_token" value="<%= view.h(view.csrf_token) %>">
+                  <% unless p[:status] == "resolved" -%>
+                    <button type="submit" name="status" value="resolved" class="btn btn-sm btn-primary">Resolve</button>
+                  <% end -%>
+                  <% unless p[:status] == "ignored" -%>
+                    <button type="submit" name="status" value="ignored" class="btn btn-sm btn-secondary">Ignore</button>
+                  <% end -%>
+                  <% unless p[:status] == "open" -%>
+                    <button type="submit" name="status" value="open" class="btn btn-sm btn-secondary">Reopen</button>
+                  <% end -%>
+                </form>
+              </td>
+            </tr>
+          <% end -%>
+        </tbody>
+      </table>
+    </div>
+
+    <%= view.render_partial("_pagination.html.erb",
+      base_href: "#{view.base_path}/issues", page: view.page, has_next: view.has_next,
+      params: {"search" => view.search, "status" => view.status, "sort_by" => view.sort_by,
+               "since" => view.since_param, "until" => view.until_param, "per_page" => view.per_page.to_s}) %>
+  <% end -%>
+<% end -%>

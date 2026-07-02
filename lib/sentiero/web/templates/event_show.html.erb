@@ -1,0 +1,52 @@
+<div class="card mb-3">
+  <div class="flex items-center gap-2 px-4 py-2.5">
+    <a href="<%= view.h(view.base_path) %>/custom-events" class="btn btn-sm btn-secondary shrink-0">&larr; Back</a>
+    <div class="w-px h-4 bg-gray-200 shrink-0"></div>
+    <span class="badge badge-neutral shrink-0"><%= view.h(view.event["name"].to_s) %></span>
+    <% case view.event["level"]
+       when "error" -%>
+      <span class="badge badge-danger shrink-0"><%= view.h(view.event["level"].to_s) %></span>
+    <% when "warn" -%>
+      <span class="badge badge-warning shrink-0"><%= view.h(view.event["level"].to_s) %></span>
+    <% when "info" -%>
+      <span class="badge badge-info shrink-0"><%= view.h(view.event["level"].to_s) %></span>
+    <% else -%>
+      <span class="badge badge-neutral shrink-0"><%= view.h(view.event["level"].to_s) %></span>
+    <% end -%>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h5 class="text-sm font-semibold text-gray-800 mb-2"><%= view.h(view.event["name"].to_s) %></h5>
+    <div class="grid grid-cols-[100px_1fr] gap-x-4 gap-y-2 mt-3">
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Project</div>
+      <div class="text-xs text-gray-600"><%= view.h(view.event["project"].to_s) %></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Level</div>
+      <div class="text-xs text-gray-600"><%= view.h(view.event["level"].to_s) %></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Time</div>
+      <div class="text-xs text-gray-600"><%= view.event["timestamp"] ? Time.at(view.event["timestamp"].to_f).utc.strftime("%b %d, %Y %H:%M:%S UTC") : "N/A" %></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Event ID</div>
+      <div class="text-xs text-gray-600 font-mono"><%= view.h(view.event["id"].to_s) %></div>
+
+      <% if view.event["session_id"] && !view.event["session_id"].to_s.empty? -%>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Session</div>
+        <div class="text-xs text-gray-600">
+          <a href="<%= view.h(view.base_path) %>/sessions/<%= view.h(view.event["session_id"]) %>" class="text-blue-600 hover:text-blue-800 font-mono"><%= view.h(view.event["session_id"].to_s) %></a>
+        </div>
+      <% end -%>
+    </div>
+  </div>
+</div>
+
+<% if view.event["payload"] -%>
+<div class="card">
+  <div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 mb-3 uppercase tracking-wider">Payload</h6>
+    <pre class="text-[11px] text-gray-600 bg-gray-50 rounded p-3 overflow-x-auto whitespace-pre-wrap font-mono"><%= view.h(JSON.pretty_generate(view.event["payload"])) %></pre>
+  </div>
+</div>
+<% end -%>

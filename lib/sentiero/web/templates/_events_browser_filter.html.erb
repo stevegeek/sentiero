@@ -1,0 +1,18 @@
+<form method="get" action="<%= view.h(view.base_path) %>/custom-events">
+  <input type="hidden" name="source" value="browser">
+  <div class="card mb-4">
+    <div class="flex flex-wrap items-end gap-3 px-4 py-3">
+      <div class="shrink-0">
+        <label for="search" class="label">Search</label>
+        <input type="text" name="search" id="search" class="input w-56"
+               value="<%= view.h(search) %>" placeholder="Event name…">
+      </div>
+      <%= view.render_partial("_date_range.html.erb", since: since_param, until_str: until_param) %>
+      <div class="shrink-0 flex items-center gap-1.5">
+        <input type="hidden" name="per_page" value="<%= per_page %>">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="<%= view.h(view.base_path) %>/custom-events?source=browser" class="btn btn-secondary">Clear</a>
+      </div>
+    </div>
+  </div>
+</form>

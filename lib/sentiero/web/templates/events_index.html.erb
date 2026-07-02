@@ -1,0 +1,177 @@
+<h1 class="page-title mb-1">Events</h1>
+<%= view.render_partial("_tabs.html.erb", tabs: [
+  {label: "Server events", href: "#{view.base_path}/custom-events", active: view.source != "browser"},
+  {label: "Browser events", href: "#{view.base_path}/custom-events?source=browser", active: view.source == "browser"}
+]) %>
+
+<% if view.source == "browser" -%>
+  <%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "entries") %>
+
+  <%= view.render_partial("_events_browser_filter.html.erb", search: view.search, per_page: view.per_page,
+    since_param: view.since_param, until_param: view.until_param) %>
+
+  <%# C1: same payload-metrics card as the server tab, fed by the browser
+      rows (computed over the full filtered list, not just this page). -%>
+  <%= view.render_partial("_payload_metrics.html.erb",
+    single_name: view.single_name, metric_keys: view.metric_keys, metric_key: view.metric_key,
+    metric_days: view.metric_days,
+    hidden_params: {"source" => "browser", "search" => view.search,
+                    "since" => view.since_param, "until" => view.until_param,
+                    "per_page" => view.per_page.to_s}) %>
+
+  <% if view.browser_rows.empty? -%>
+    <div class="card"><div class="text-center py-10 px-6 text-gray-400 text-xs">
+      <% if !view.search.empty? -%>
+        No results match your filters.
+        <a href="<%= view.h(view.base_path) %>/custom-events?source=browser" class="text-blue-600 hover:text-blue-800">Clear filters</a>
+      <% else -%>
+        No browser events captured yet.
+        <%= view.render_partial("_sibling_tab_hint.html.erb",
+          sibling: view.sibling, noun: "server event", href: "#{view.base_path}/custom-events") %>
+      <% end -%>
+    </div></div>
+  <% else -%>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Session</th><th>Window</th><th class="w-24">Time</th><th>Replay</th></tr></thead>
+        <tbody>
+          <% view.browser_rows.each do |r| -%>
+            <tr>
+              <td class="font-medium"><%= view.h(r[:name]) %>
+                <% if r[:payload] && !r[:payload].empty? -%>
+                  <details class="inline-block align-middle ml-1"><summary class="text-[10px] text-gray-400 cursor-pointer select-none">payload</summary><div class="text-[10px] text-gray-600 bg-gray-50 rounded p-1 mt-0.5 font-mono break-all"><%= view.h(r[:payload].to_json) %></div></details>
+                <% end -%>
+              </td>
+              <td class="font-mono text-xs"><%= view.h(r[:session_id].to_s[0, 12]) %></td>
+              <td class="font-mono text-xs"><%= view.h(r[:window_id].to_s[0, 8]) %></td>
+              <td class="text-gray-400 text-[10px] tabular-nums"><%= r[:offset_ms] ? "+#{(r[:offset_ms].to_f / 1000).round}s" : "—" %></td>
+              <td><a class="text-blue-600 hover:text-blue-800" href="<%= view.h(view.base_path) %>/sessions/<%= view.h(r[:session_id]) %>/windows/<%= view.h(r[:window_id]) %>?t=<%= r[:offset_ms] %>">Open at event &rarr;</a></td>
+            </tr>
+          <% end -%>
+        </tbody>
+      </table>
+    </div>
+
+    <%= view.render_partial("_pagination.html.erb",
+      base_href: "#{view.base_path}/custom-events", page: view.page, has_next: view.has_next,
+      params: {"source" => "browser", "search" => view.search,
+               "since" => view.since_param, "until" => view.until_param, "per_page" => view.per_page.to_s}) %>
+  <% end -%>
+<% else -%>
+  <%= view.render_partial("_events_server_filter.html.erb",
+    search: view.search, level: view.level, project: view.project, projects: view.projects, per_page: view.per_page,
+    since_param: view.since_param, until_param: view.until_param) %>
+
+  <% unless view.level_mix.empty? -%>
+    <div class="card mb-4">
+      <div class="card-body">
+        <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">
+          <%= view.volume_scaled? ? "Volume per Day" : "Level Mix per Day" %>
+          <span class="font-normal normal-case tracking-normal text-gray-400">&mdash; filtered events, by UTC day<%= view.volume_scaled? ? "; bar length is the day's share of the busiest day" : "" %></span>
+        </h6>
+        <% level_colors = {"debug" => "#9ca3af", "info" => "#3b82f6", "warn" => "#f59e0b"} -%>
+        <% view.level_mix.each do |date, counts| -%>
+          <% total = counts.values.sum -%>
+          <% volume_pct = (total.to_f / view.mix_max * 100).round(1) -%>
+          <div class="flex items-center gap-2 mb-1.5" data-level-day="<%= view.h(date) %>">
+            <div class="text-[10px] text-gray-500 w-16 shrink-0 tabular-nums"><%= view.h(date) %></div>
+            <div class="flex-1">
+              <% if view.volume_scaled? -%>
+                <div class="flex h-3 rounded overflow-hidden bg-gray-100" style="width:<%= volume_pct %>%" data-volume-pct="<%= volume_pct %>">
+              <% else -%>
+                <div class="flex h-3 rounded overflow-hidden bg-gray-100">
+              <% end -%>
+                <% level_colors.each do |lvl, color| -%>
+                  <% count = counts[lvl] -%>
+                  <% next if count == 0 -%>
+                  <div style="width:<%= (count.to_f / total * 100).round(1) %>%;background:<%= color %>" title="<%= count %> <%= lvl %> on <%= view.h(date) %>" data-level-seg="<%= lvl %>"></div>
+                <% end -%>
+                <% if counts["error"] > 0 -%>
+                  <a href="<%= view.h(view.base_path) %>/custom-events?<%= view.h(view.error_query(date)) %>" style="width:<%= (counts["error"].to_f / total * 100).round(1) %>%;background:#dc2626" title="<%= counts["error"] %> error<%= counts["error"] == 1 ? "" : "s" %> on <%= view.h(date) %> (click to filter)" data-level-seg="error"></a>
+                <% end -%>
+              </div>
+            </div>
+            <div class="text-[10px] text-gray-400 w-8 text-right tabular-nums"><%= total %></div>
+          </div>
+        <% end -%>
+      </div>
+    </div>
+  <% end -%>
+
+  <%# C5(c): numeric payload metrics, offered when the filters narrowed the
+      fetched rows to one event name; computed over those same rows. -%>
+  <%= view.render_partial("_payload_metrics.html.erb",
+    single_name: view.single_name, metric_keys: view.metric_keys, metric_key: view.metric_key,
+    metric_days: view.metric_days,
+    hidden_params: {"search" => view.search, "level" => view.level, "project" => view.project,
+                    "since" => view.since_param, "until" => view.until_param,
+                    "per_page" => view.per_page.to_s}) %>
+
+  <% if view.events.empty? -%>
+    <div class="card"><div class="text-center py-10 px-6 text-gray-400 text-xs">
+      <% if !view.search.empty? || !view.level.empty? || !view.project.empty? || !view.since_param.empty? || !view.until_param.empty? -%>
+        No results match your filters.
+        <a href="<%= view.h(view.base_path) %>/custom-events" class="text-blue-600 hover:text-blue-800">Clear filters</a>
+      <% else -%>
+        No events recorded yet.
+        <%= view.render_partial("_sibling_tab_hint.html.erb",
+          sibling: view.sibling, noun: "browser event", href: "#{view.base_path}/custom-events?source=browser") %>
+      <% end -%>
+    </div></div>
+  <% else -%>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Project</th>
+            <th>Level</th>
+            <th>Session</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% view.events.each do |e| -%>
+            <tr>
+              <td class="font-medium">
+                <a href="<%= view.h(view.base_path) %>/custom-events/<%= view.h(e["id"].to_s) %>" class="text-blue-600 hover:text-blue-800"><%= view.h(e["name"].to_s) %></a>
+                <% if e["payload"].is_a?(Hash) && !e["payload"].empty? -%>
+                  <details class="inline-block align-middle ml-1">
+                    <summary class="text-[10px] text-gray-400 cursor-pointer select-none">payload</summary>
+                    <div class="text-[10px] text-gray-600 bg-gray-50 rounded p-1 mt-0.5 font-mono break-all"><%= view.h(e["payload"].to_json) %></div>
+                  </details>
+                <% end -%>
+              </td>
+              <td class="text-xs text-gray-600"><%= view.h(e["project"].to_s) %></td>
+              <td>
+                <% case e["level"]
+                   when "error" -%>
+                  <span class="badge badge-danger"><%= view.h(e["level"].to_s) %></span>
+                <% when "warn" -%>
+                  <span class="badge badge-warning"><%= view.h(e["level"].to_s) %></span>
+                <% when "info" -%>
+                  <span class="badge badge-info"><%= view.h(e["level"].to_s) %></span>
+                <% else -%>
+                  <span class="badge badge-neutral"><%= view.h(e["level"].to_s) %></span>
+                <% end -%>
+              </td>
+              <td>
+                <% if e["session_id"] && !e["session_id"].empty? -%>
+                  <a href="<%= view.h(view.base_path) %>/sessions/<%= view.h(e["session_id"]) %>" class="text-blue-600 hover:text-blue-800 text-xs font-mono"><%= view.h(e["session_id"].to_s[0, 16]) %>&hellip;</a>
+                <% else -%>
+                  <span class="text-gray-400">&mdash;</span>
+                <% end -%>
+              </td>
+              <td class="text-gray-400 text-[10px] tabular-nums"><%= e["timestamp"] ? Time.at(e["timestamp"].to_f).utc.strftime("%b %d, %H:%M:%S") : "N/A" %></td>
+            </tr>
+          <% end -%>
+        </tbody>
+      </table>
+    </div>
+
+    <%= view.render_partial("_pagination.html.erb",
+      base_href: "#{view.base_path}/custom-events", page: view.page, has_next: view.has_next,
+      params: {"search" => view.search, "level" => view.level, "project" => view.project,
+               "since" => view.since_param, "until" => view.until_param, "per_page" => view.per_page.to_s}) %>
+  <% end -%>
+<% end -%>

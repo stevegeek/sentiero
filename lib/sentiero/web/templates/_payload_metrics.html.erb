@@ -1,0 +1,62 @@
+<%# Numeric payload metrics, offered when the filters narrowed the
+    fetched rows to one event name; computed over those same rows. Shared by
+    the server and browser tabs of the events index — `hidden_params` carries
+    the active tab's filter state into the metric-key form (incl.
+    source=browser on the browser tab) so choosing a key stays on the tab. -%>
+<% if single_name && !metric_keys.empty? -%>
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Payload Metrics
+        <span class="font-normal normal-case tracking-normal text-gray-400">&mdash;
+          <code class="font-mono normal-case"><%= view.h(single_name) %></code>, numeric payload keys by UTC day</span>
+      </h6>
+
+      <form method="get" action="<%= view.h(view.base_path) %>/custom-events" class="flex items-end gap-2 mb-3">
+        <% hidden_params.reject { |_key, value| value.to_s.empty? }.each do |key, value| -%>
+          <input type="hidden" name="<%= view.h(key) %>" value="<%= view.h(value) %>">
+        <% end -%>
+        <div class="shrink-0">
+          <label for="metric_key" class="label">Payload key</label>
+          <select name="metric_key" id="metric_key" class="select" style="width:12rem">
+            <option value="">Choose a key&hellip;</option>
+            <% metric_keys.each do |key| -%>
+              <option value="<%= view.h(key) %>" <%= (metric_key == key) ? "selected" : "" %>><%= view.h(key) %></option>
+            <% end -%>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-sm btn-secondary">Show</button>
+      </form>
+
+      <% if metric_key -%>
+        <% if metric_days.empty? -%>
+          <p class="text-gray-400 text-xs py-2">No values recorded for this key in the filtered rows.</p>
+        <% else -%>
+          <table class="w-full text-xs">
+            <tr class="border-b border-gray-100">
+              <% %w[Day Count Sum Avg Min Max].each_with_index do |label, i| -%>
+                <th class="py-1 text-[10px] font-medium text-gray-400 uppercase tracking-wider <%= i.zero? ? "text-left" : "text-right" %>"><%= label %></th>
+              <% end -%>
+            </tr>
+            <% metric_days.each do |date, m| -%>
+              <% avg = (m[:count] > 0) ? (m[:sum] / m[:count]).round(2) : nil -%>
+              <tr class="border-b border-gray-100 last:border-0" data-metric-day="<%= view.h(date) %>">
+                <td class="py-1 text-gray-700 tabular-nums"><%= view.h(date) %></td>
+                <td class="py-1 text-right text-gray-500 tabular-nums" data-metric-count="<%= m[:count] %>"><%= m[:count] %></td>
+                <td class="py-1 text-right text-gray-700 tabular-nums font-medium" data-metric-sum="<%= m[:sum].round(2) %>"><%= m[:sum].round(2) %></td>
+                <td class="py-1 text-right text-gray-500 tabular-nums" data-metric-avg="<%= avg %>"><%= avg || "&mdash;" %></td>
+                <td class="py-1 text-right text-gray-500 tabular-nums" data-metric-min="<%= m[:min]&.round(2) %>"><%= m[:min] ? m[:min].round(2) : "&mdash;" %></td>
+                <td class="py-1 text-right text-gray-500 tabular-nums" data-metric-max="<%= m[:max]&.round(2) %>"><%= m[:max] ? m[:max].round(2) : "&mdash;" %></td>
+              </tr>
+            <% end -%>
+          </table>
+          <% skipped = metric_days.sum { |_date, m| m[:non_numeric] } -%>
+          <% if skipped > 0 -%>
+            <p class="text-[10px] text-gray-400 mt-2">
+              Skipped <%= skipped %> non-numeric value<%= skipped == 1 ? "" : "s" %> for this key.
+            </p>
+          <% end -%>
+        <% end -%>
+      <% end -%>
+    </div>
+  </div>
+<% end -%>

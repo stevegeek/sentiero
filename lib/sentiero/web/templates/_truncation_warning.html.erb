@@ -1,0 +1,19 @@
+<%# Warning shown when an analytics session scan was cut short by the
+    analytics_max_scan_sessions cap (or an accumulation bound), so the figures
+    on the page may be incomplete. `noun` names what may be missing (default
+    "data"); pass `scanned` to report the exact number of sessions scanned. %>
+<% if was_truncated -%>
+  <% noun = (defined?(noun) && noun) ? noun : "data" -%>
+  <% scanned = (defined?(scanned) && scanned) ? scanned : nil -%>
+  <div class="banner-warning">
+    <% if scanned -%>
+      <span><strong>Results are incomplete.</strong> Only the first <%= scanned %>
+        sessions were scanned (the <code class="font-mono">analytics_max_scan_sessions</code>
+        cap), so some <%= view.h(noun) %> may not be reflected below.</span>
+    <% else -%>
+      <span><strong>Results may be incomplete.</strong> The session scan hit the
+        <code class="font-mono">analytics_max_scan_sessions</code> cap or an
+        accumulation bound, so some <%= view.h(noun) %> may not be reflected below.</span>
+    <% end -%>
+  </div>
+<% end -%>

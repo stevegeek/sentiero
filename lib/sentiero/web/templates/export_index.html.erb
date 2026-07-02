@@ -1,0 +1,69 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :export, since: view.since, until_str: view.until_str) %>
+<h1 class="page-title">Export</h1>
+
+<p class="text-xs text-gray-500 mb-4">
+  Download analytics datasets as CSV or JSON. Exports are bounded by the
+  <code>analytics_max_scan_sessions</code> cap, so very large stores may be
+  truncated.
+  <%# C2 (P2.2): attribution semantics, so exported per-URL numbers can't be
+      misread as something more exact than they are. -%>
+  Per-URL rows attribute each event to the page on screen when the event
+  happened (derived from the recording&rsquo;s page-load markers); entry pages
+  are the first page seen in the recording.
+</p>
+
+<%# The range is set via this GET form (no-JS friendly) and carried into
+    every dataset's POST form below as hidden fields. Empty = all data. -%>
+<form method="get" action="<%= view.h(view.base_path) %>/analytics/export">
+  <div class="card mb-4">
+    <div class="flex items-end gap-3 px-4 py-3">
+      <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+      <div class="shrink-0 flex items-center gap-1.5">
+        <button type="submit" class="btn btn-primary">Set range</button>
+        <a href="<%= view.h(view.base_path) %>/analytics/export" class="btn btn-secondary">Clear</a>
+      </div>
+      <div class="shrink-0 pb-1.5 text-[10px] text-gray-400">
+        Empty = all data. The range is stamped into the download filename.
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Dataset</th>
+          <th>Download</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% view.datasets.each do |key, label| -%>
+          <tr>
+            <td class="text-sm text-gray-900"><%= view.h(label) %></td>
+            <td>
+              <div class="flex gap-2">
+                <% %w[csv json].each do |format| -%>
+                  <form method="post" action="<%= view.h(view.base_path) %>/analytics/export/<%= view.h(key) %>.<%= format %>">
+                    <input type="hidden" name="csrf_token" value="<%= view.h(view.csrf_token) %>">
+                    <input type="hidden" name="since" value="<%= view.h(view.since) %>">
+                    <input type="hidden" name="until" value="<%= view.h(view.until_str) %>">
+                    <button type="submit" class="btn btn-sm btn-secondary">Download <%= format.upcase %></button>
+                  </form>
+                <% end -%>
+              </div>
+            </td>
+          </tr>
+        <% end -%>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="mt-4 flex items-center gap-2">
+  <% if view.shareable_replays -%>
+    <a href="<%= view.h(view.base_path) %>/analytics/import" class="btn btn-sm btn-secondary">Import replay</a>
+  <% end -%>
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>

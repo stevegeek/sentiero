@@ -1,0 +1,105 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :forms, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Form Analytics</h1>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics/forms" class="flex items-end gap-2">
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+  </form>
+</div>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "sessions") %>
+
+<% if view.sessions_started == 0 -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      No form interactions recorded yet.
+    </div>
+  </div>
+<% else -%>
+  <p class="text-xs text-gray-500 mb-3">
+    Fields are identified by interaction patterns only &mdash; no values are ever
+    read, so this works with masked inputs. Submits are <em>real</em> submit
+    events captured by the recorder (<code>track_forms</code>), attributed to the
+    page they happened on: a session counts as submitted only when every page it
+    typed on was also submitted there. <strong>Capture note:</strong> sessions
+    recorded before submit capture existed (or with <code>track_forms</code>
+    off) contain no submit events and show zero submits.
+  </p>
+
+  <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-5">
+    <div class="card">
+      <div class="px-5 py-4">
+        <div class="text-2xl font-bold text-gray-900 tracking-tight"><%= view.sessions_started %></div>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Sessions Interacting</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="px-5 py-4">
+        <div class="text-2xl font-bold text-gray-900 tracking-tight"><%= view.sessions_completed %></div>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Sessions Submitted</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="px-5 py-4">
+        <div class="text-2xl font-bold text-gray-900 tracking-tight"><%= (view.completion_rate * 100).round %>%</div>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Completion Rate</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="px-5 py-4">
+        <div class="text-2xl font-bold text-gray-900 tracking-tight"><%= view.total_submits %></div>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-1">Form Submits</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Per-Field Metrics</h6>
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-gray-500 border-b border-gray-200">
+            <th class="py-1 text-left font-medium">Field</th>
+            <th class="py-1 text-right font-medium">Completion</th>
+            <th class="py-1 text-right font-medium">Avg Time to Fill</th>
+            <th class="py-1 text-right font-medium">Re-fills</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% view.fields.each do |field| -%>
+            <tr class="border-b border-gray-100 last:border-0">
+              <td class="py-1 text-gray-700"><%= view.h(field[:label] || "Field ##{field[:field_id]}") %><% if field[:url] %> <span class="text-gray-400">on <%= view.h(field[:url]) %></span><% end %></td>
+              <td class="py-1 text-right text-gray-500 tabular-nums"><%= (field[:completion_rate] * 100).round %>%</td>
+              <td class="py-1 text-right text-gray-500 tabular-nums"><%= (field[:avg_time_to_fill_ms] / 1000.0).round(1) %>s</td>
+              <td class="py-1 text-right text-gray-500 tabular-nums"><%= field[:total_refills] %></td>
+            </tr>
+          <% end -%>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Top Drop-off Fields</h6>
+      <% if view.drop_off_fields.empty? -%>
+        <p class="text-gray-400 text-xs py-4 text-center">No abandoned forms &mdash; every interacting session submitted.</p>
+      <% else -%>
+        <p class="text-[10px] text-gray-400 mb-2">The last field touched before the session left without submitting.</p>
+        <table class="w-full text-xs">
+          <% view.drop_off_fields.each do |field| -%>
+            <tr class="border-b border-gray-100 last:border-0">
+              <td class="py-1 text-gray-700"><%= view.h(field[:label] || "Field ##{field[:field_id]}") %><% if field[:url] %> <span class="text-gray-400">on <%= view.h(field[:url]) %></span><% end %></td>
+              <td class="py-1 text-right text-gray-500 tabular-nums"><%= field[:count] %> drop-off<%= field[:count] == 1 ? "" : "s" %></td>
+            </tr>
+          <% end -%>
+        </table>
+      <% end -%>
+    </div>
+  </div>
+<% end -%>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>

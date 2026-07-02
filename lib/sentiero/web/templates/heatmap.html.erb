@@ -1,0 +1,76 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :heatmap, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <div class="flex items-center gap-3">
+    <h1 class="page-title mb-0">Click Heatmaps</h1>
+    <% if view.selected_url && !view.selected_url.to_s.empty? -%>
+      <a class="text-blue-600 hover:text-blue-800 text-xs" href="<%= view.h(view.page_report_href) %>">Page report &rarr;</a>
+    <% end -%>
+  </div>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics/heatmap" class="flex items-end gap-2">
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <div class="shrink-0">
+      <label for="url" class="label">Page</label>
+      <select name="url" id="url" class="select" style="width:22rem" data-heatmap-url>
+        <% if view.urls.empty? -%>
+          <option value="">No recorded pages</option>
+        <% end -%>
+        <% view.urls.each do |u| -%>
+          <option value="<%= view.h(u) %>" <%= u == view.selected_url ? "selected" : "" %>><%= view.h(u) %></option>
+        <% end -%>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-sm btn-secondary" data-heatmap-apply>Apply</button>
+  </form>
+</div>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "sessions") %>
+
+<% if view.urls.empty? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      No recorded pages with clicks yet.
+    </div>
+  </div>
+<% else -%>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="card lg:col-span-2">
+      <div class="card-body">
+        <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Click Density</h6>
+        <div id="heatmap-status" class="text-xs text-gray-400 mb-2">Loading&hellip;</div>
+        <div id="heatmap-canvas-wrapper" class="inline-block max-w-full overflow-auto border border-gray-100 rounded bg-gray-50">
+          <canvas id="heatmap-canvas"></canvas>
+        </div>
+        <p class="text-[10px] text-gray-400 mt-2">
+          Clicks are placed at their position on the <em>page</em> (click + scroll offset),
+          aggregated across sessions on this page. Vertical position is normalized to an
+          estimated page height &mdash; the deepest recorded scroll plus the viewport &mdash;
+          so below-the-fold clicks land where they happened; horizontal position is
+          normalized by viewport width.
+          <%# C2 (P2.2): estimation caveat extending the A2 caption. -%>
+          The height is an estimate: pages that were never scrolled fall back to
+          viewport height, and under-scrolled pages can read taller than recorded,
+          so vertical positions are approximate.
+        </p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Top Clicked Elements</h6>
+        <table class="w-full text-xs">
+          <tbody id="heatmap-top-elements">
+            <tr><td class="py-2 text-gray-400 text-center">Loading&hellip;</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+<% end -%>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>
+
+<script type="application/json" id="heatmap-config"><%= view.escape_json(view.config_json) %></script>
+<script src="<%= view.built_asset('heatmap') %>" defer></script>

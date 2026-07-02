@@ -1,0 +1,97 @@
+<h1 class="page-title">Sessions</h1>
+
+<form method="get" action="<%= view.h(view.base_path) %>/">
+  <div class="card mb-4">
+    <div class="flex items-end gap-3 px-4 py-3">
+      <div class="shrink-0">
+        <label for="search" class="label">Search</label>
+        <input type="text" name="search" id="search" class="input" style="width:11rem" value="<%= view.h(view.search) %>" placeholder="Session ID or metadata...">
+      </div>
+      <div class="shrink-0">
+        <label for="since" class="label">From</label>
+        <input type="date" name="since" id="since" class="input" style="width:8.5rem" value="<%= view.h(view.since) %>">
+      </div>
+      <div class="shrink-0">
+        <label for="until" class="label">To</label>
+        <input type="date" name="until" id="until" class="input" style="width:8.5rem" value="<%= view.h(view.until_param) %>">
+      </div>
+      <div class="shrink-0">
+        <label for="sort_by" class="label">Sort by</label>
+        <select name="sort_by" id="sort_by" class="select" style="width:9rem">
+          <option value="updated_at" <%= view.sort_by == "updated_at" ? "selected" : "" %>>Last Activity</option>
+          <option value="created_at" <%= view.sort_by == "created_at" ? "selected" : "" %>>Created</option>
+          <option value="event_count" <%= view.sort_by == "event_count" ? "selected" : "" %>>Event Count</option>
+        </select>
+      </div>
+      <div class="shrink-0 flex items-center gap-1.5 self-end pb-1.5">
+        <input type="checkbox" name="has_errors" id="has_errors" value="true" class="checkbox" <%= view.has_errors ? "checked" : "" %>>
+        <label for="has_errors" class="label mb-0">Has errors</label>
+      </div>
+      <div class="shrink-0 flex items-center gap-1.5">
+        <input type="hidden" name="per_page" value="<%= view.per_page %>">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="<%= view.h(view.base_path) %>/" class="btn btn-secondary">Clear</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<% if view.sessions.empty? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      <% if !view.search.empty? || !view.since.empty? || !view.until_param.empty? || view.has_errors -%>
+        No results match your filters. <a href="<%= view.h(view.base_path) %>/" class="text-blue-500 hover:text-blue-700">Clear filters</a>
+      <% else -%>
+        No sessions recorded yet.
+      <% end -%>
+    </div>
+  </div>
+<% else -%>
+  <form id="bulk-delete-form" method="post" action="<%= view.h(view.base_path) %>/sessions/bulk_delete" data-confirm="Delete selected sessions?">
+    <input type="hidden" name="csrf_token" value="<%= view.h(view.csrf_token) %>">
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="w-8 text-center"><input type="checkbox" id="select-all" title="Select all" class="checkbox"></th>
+            <th>Session ID</th>
+            <%# C2: metadata url is overwritten per page load, so this column
+                shows the session's most recent page — labeled honestly. -%>
+            <th>Last page</th>
+            <th>Device</th>
+            <th>Windows</th>
+            <th>Events</th>
+            <th>Duration</th>
+            <th>Last Activity</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% view.sessions.each do |s| -%>
+            <%= view.render_session_row(s, true, view.csrf_token) %>
+          <% end -%>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex justify-between items-center flex-wrap mt-3">
+      <nav aria-label="Session pagination">
+        <ul class="pagination">
+          <li class="<%= 'page-disabled' if view.page <= 1 %>">
+            <a class="page-link" href="<%= view.h(view.base_path) %>/?page=<%= view.page - 1 %>&per_page=<%= view.per_page %>&search=<%= view.h(view.search) %>&sort_by=<%= view.h(view.sort_by) %>&since=<%= view.h(view.since) %>&until=<%= view.h(view.until_param) %><%= view.has_errors ? "&has_errors=true" : "" %>">Previous</a>
+          </li>
+          <li class="<%= 'page-disabled' unless view.has_next %>">
+            <a class="page-link" href="<%= view.h(view.base_path) %>/?page=<%= view.page + 1 %>&per_page=<%= view.per_page %>&search=<%= view.h(view.search) %>&sort_by=<%= view.h(view.sort_by) %>&since=<%= view.h(view.since) %>&until=<%= view.h(view.until_param) %><%= view.has_errors ? "&has_errors=true" : "" %>">Next</a>
+          </li>
+        </ul>
+      </nav>
+      <div id="bulk-actions" style="display:none" class="flex items-center gap-2">
+        <button type="submit" class="btn btn-sm btn-danger">Delete Selected</button>
+        <span class="text-gray-400 text-[10px]"><span id="selected-count">0</span> selected</span>
+      </div>
+    </div>
+  </form>
+
+  <script src="<%= view.built_asset('sessions_index') %>"></script>
+<% end -%>

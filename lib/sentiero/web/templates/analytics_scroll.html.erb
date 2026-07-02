@@ -1,0 +1,94 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :scroll, since: view.since, until_str: view.until_str) %>
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Scroll Depth</h1>
+
+  <form method="get" action="<%= view.h(view.base_path) %>/analytics/scroll" class="flex items-end gap-2">
+    <%= view.render_partial("_date_range.html.erb", since: view.since, until_str: view.until_str) %>
+    <button type="submit" class="btn btn-sm btn-secondary">Apply</button>
+  </form>
+</div>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "sessions") %>
+
+<% if view.sorted_pages.empty? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      No scroll data recorded yet.
+    </div>
+  </div>
+<% else -%>
+  <p class="text-xs text-gray-500 mb-3">
+    Depth is the absolute percentage of the page each session reached. The page
+    height is <em>estimated</em> per page as the deepest recorded scroll plus the
+    viewport &mdash; exact whenever a session read to the end, a lower bound
+    otherwise. The histogram bins sessions by that page percentage.
+  </p>
+
+  <% view.sorted_pages.each do |url, page| -%>
+    <%
+      folds = page[:fold_lines]
+      dist = page[:distribution]
+    -%>
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-sm font-medium text-gray-900 break-words"><%= view.h(url) %></div>
+          <a class="text-blue-600 hover:text-blue-800 text-xs shrink-0 ml-3" href="<%= view.h(view.page_report_href(url)) %>">Page report &rarr;</a>
+        </div>
+        <div class="text-xs text-gray-500 mb-3">
+          <%= page[:session_count] %> session<%= page[:session_count] == 1 ? "" : "s" %>,
+          avg depth <%= page[:avg_depth_px].round %>px<%
+            if page[:avg_depth_pct] %> (~<%= page[:avg_depth_pct].round %>% of the page)<% end %><%
+            if page[:page_height_px] %>, est. page height <%= page[:page_height_px].round %>px<% end %>.
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Depth Distribution</h6>
+            <svg viewBox="0 0 <%= view.svg_width %> <%= view.svg_height %>" width="100%" style="max-width:<%= view.svg_width %>px" role="img" aria-label="Scroll depth distribution">
+              <line x1="0" y1="<%= view.axis_y %>" x2="<%= view.svg_width %>" y2="<%= view.axis_y %>" stroke="#e5e7eb" stroke-width="1" />
+              <% dist.each_with_index do |(label, count), i| -%>
+                <%
+                  bar_h = (count.to_f / view.max_count(dist) * (view.axis_y - view.chart_top)).round(1)
+                  x = view.bar_gap + i * (view.bar_width + view.bar_gap)
+                  y = (view.axis_y - bar_h).round(1)
+                -%>
+                <rect x="<%= x %>" y="<%= y %>" width="<%= view.bar_width %>" height="<%= bar_h %>" fill="#2563eb" rx="2" />
+                <text x="<%= x + view.bar_width / 2 %>" y="<%= (y - 4).round(1) %>" text-anchor="middle" font-size="10" fill="#374151"><%= count %></text>
+                <text x="<%= x + view.bar_width / 2 %>" y="<%= view.axis_y + 14 %>" text-anchor="middle" font-size="9" fill="#6b7280"><%= view.h(label) %>%</text>
+              <% end -%>
+            </svg>
+          </div>
+
+          <div>
+            <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-2">Fold Lines</h6>
+            <table class="w-full text-xs">
+              <tbody>
+                <tr>
+                  <td class="py-1 text-gray-500">50th percentile</td>
+                  <td class="py-1 text-right tabular-nums"><%= folds[:p50] ? "#{folds[:p50].round}% of page" : "&mdash;" %></td>
+                </tr>
+                <tr>
+                  <td class="py-1 text-gray-500">75th percentile</td>
+                  <td class="py-1 text-right tabular-nums"><%= folds[:p75] ? "#{folds[:p75].round}% of page" : "&mdash;" %></td>
+                </tr>
+                <tr>
+                  <td class="py-1 text-gray-500">90th percentile</td>
+                  <td class="py-1 text-right tabular-nums"><%= folds[:p90] ? "#{folds[:p90].round}% of page" : "&mdash;" %></td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="text-[10px] text-gray-400 mt-2">
+              The page depth that this fraction of sessions reached or exceeded
+              (of the estimated page height).
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end -%>
+<% end -%>
+
+<div class="mt-4">
+  <a href="<%= view.h(view.base_path) %>/analytics" class="btn btn-sm btn-secondary">&larr; Back to Analytics</a>
+</div>

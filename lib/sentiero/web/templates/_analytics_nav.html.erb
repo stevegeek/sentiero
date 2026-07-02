@@ -1,0 +1,22 @@
+<%
+  range_pairs = {}
+  range_pairs["since"] = since if since && !since.to_s.empty?
+  range_pairs["until"] = until_str if until_str && !until_str.to_s.empty?
+  range_qs = range_pairs.empty? ? "" : "?" + Rack::Utils.build_query(range_pairs)
+
+  nav_tabs = [
+    {label: "Overview", href: "#{view.base_path}/analytics#{range_qs}", active: active == :overview},
+    {label: "Heatmap", href: "#{view.base_path}/analytics/heatmap#{range_qs}", active: active == :heatmap},
+    {label: "Scroll", href: "#{view.base_path}/analytics/scroll#{range_qs}", active: active == :scroll},
+    {label: "Forms", href: "#{view.base_path}/analytics/forms#{range_qs}", active: active == :forms},
+    {label: "Pages", href: "#{view.base_path}/analytics/page#{range_qs}", active: active == :pages},
+    {label: "Segments", href: "#{view.base_path}/analytics/segments#{range_qs}", active: active == :segments},
+    {label: "Web Vitals", href: "#{view.base_path}/analytics/vitals#{range_qs}", active: active == :vitals},
+    {label: "Frustration", href: "#{view.base_path}/analytics/frustration#{range_qs}", active: active == :frustration},
+    {label: "Funnel", href: "#{view.base_path}/analytics/funnel#{range_qs}", active: active == :funnel},
+    {label: "Engagement", href: "#{view.base_path}/analytics/engagement#{range_qs}", active: active == :engagement},
+    {label: "Conversions", href: "#{view.base_path}/analytics/conversions#{range_qs}", active: active == :conversions},
+    {label: "Export", href: "#{view.base_path}/analytics/export#{range_qs}", active: active == :export}
+  ]
+-%>
+<%= view.render_partial("_tabs.html.erb", tabs: nav_tabs) %>

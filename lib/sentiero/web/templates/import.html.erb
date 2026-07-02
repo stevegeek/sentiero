@@ -1,0 +1,39 @@
+<div class="flex items-center justify-between mb-5">
+  <h1 class="page-title mb-0">Import Replay</h1>
+  <a href="<%= view.h(view.base_path) %>/analytics/export" class="btn btn-sm btn-secondary">&larr; Back to Export</a>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <p class="text-xs text-gray-500 mb-4">
+      Paste a session events JSON file below, or drag and drop one onto the box.
+      The replay runs entirely in your browser &mdash; nothing is uploaded.
+    </p>
+
+    <div id="import-dropzone" class="border-2 border-dashed border-gray-200 rounded p-4 transition-colors">
+      <label for="import-textarea" class="label">Events JSON</label>
+      <textarea id="import-textarea" class="select w-full font-mono text-xs" rows="6"
+        placeholder='[{"type":4,"timestamp":...}, ...]'></textarea>
+
+      <div class="flex items-center gap-2 mt-3">
+        <button id="import-replay" type="button" class="btn btn-sm btn-secondary">Replay</button>
+        <input id="import-file" type="file" accept="application/json,.json" class="text-xs">
+      </div>
+    </div>
+
+    <p id="import-status" class="text-xs text-gray-400 mt-3" role="status" aria-live="polite"></p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 uppercase tracking-wider mb-3">Replay</h6>
+    <div class="player-frame">
+      <div id="import-player"></div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="<%= view.built_asset('rrweb-player-css') %>">
+<script src="<%= view.built_asset('rrweb-player') %>"></script>
+<script src="<%= view.built_asset('import') %>" defer></script>

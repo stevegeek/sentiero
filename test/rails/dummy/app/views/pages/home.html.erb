@@ -1,0 +1,172 @@
+<h1>Test Page</h1>
+
+<h2>Masked Inputs <small>(default,  all inputs masked)</small></h2>
+<form id="test-form">
+  <div>
+    <label for="name">Name</label>
+    <input type="text" id="name" name="name" placeholder="Recorded as ****">
+  </div>
+
+  <div>
+    <label for="email">Email</label>
+    <input type="email" id="email" name="email" placeholder="Recorded as ****">
+  </div>
+
+  <div>
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" placeholder="Always masked">
+  </div>
+
+  <div>
+    <label for="agree">
+      <input type="checkbox" id="agree" name="agree"> I agree
+    </label>
+  </div>
+
+  <button type="button" id="test-button">Click Me</button>
+</form>
+
+<hr>
+
+<h2>Unmasked Inputs <small>(<code>data-sentiero-unmask</code>)</small></h2>
+<form id="unmasked-form" data-sentiero-unmask>
+  <div>
+    <label for="public-name">Public Name</label>
+    <input type="text" id="public-name" name="public_name" placeholder="Recorded in plaintext">
+  </div>
+
+  <div>
+    <label for="public-search">Search Query</label>
+    <input type="text" id="public-search" name="public_search" placeholder="Recorded in plaintext">
+  </div>
+
+  <div>
+    <label for="unmasked-password">Password (inside unmask container)</label>
+    <input type="password" id="unmasked-password" name="unmasked_password" placeholder="Still masked,  passwords enforced">
+  </div>
+</form>
+
+<hr>
+
+<h2>Error Simulation</h2>
+<p>Click these buttons to trigger JavaScript errors. With <code>capture_errors: true</code>, they are captured as rrweb custom events and appear as red markers in the replay timeline.</p>
+
+<div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+  <button type="button" id="trigger-error" onclick="throwSyncError()">
+    Throw Error
+  </button>
+  <button type="button" id="trigger-type-error" onclick="throwTypeError()">
+    TypeError
+  </button>
+  <button type="button" id="trigger-reference-error" onclick="throwReferenceError()">
+    ReferenceError
+  </button>
+  <button type="button" id="trigger-promise-rejection" onclick="triggerUnhandledRejection()">
+    Unhandled Promise Rejection
+  </button>
+</div>
+
+<div id="error-log" style="font-family: monospace; font-size: 0.85rem; color: #dc3545; min-height: 1.5rem;"></div>
+
+<script>
+  var errorLog = document.getElementById('error-log');
+  function logError(msg) {
+    var line = document.createElement('div');
+    line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+    errorLog.prepend(line);
+  }
+
+  function throwSyncError() {
+    logError('Throwing: Error("Something went wrong!")');
+    setTimeout(function() { throw new Error("Something went wrong!"); }, 0);
+  }
+
+  function throwTypeError() {
+    logError('Throwing: TypeError (null.foo)');
+    setTimeout(function() { var x = null; x.foo(); }, 0);
+  }
+
+  function throwReferenceError() {
+    logError('Throwing: ReferenceError (undeclaredVariable)');
+    setTimeout(function() { undeclaredVariable.doSomething(); }, 0);
+  }
+
+  function triggerUnhandledRejection() {
+    logError('Throwing: Unhandled Promise rejection');
+    Promise.reject(new Error("Async operation failed"));
+  }
+</script>
+
+<hr>
+
+<h2>Custom Events</h2>
+<p>Click these buttons to emit custom rrweb events via <code>window.Sentiero.addCustomEvent(tag, payload)</code>. They appear as purple markers in the replay timeline.</p>
+
+<div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+  <button type="button" onclick="emitCustomEvent('user_action', {action: 'button_click', label: 'Add to Cart', itemId: 'SKU-1234'})">
+    Add to Cart Event
+  </button>
+  <button type="button" onclick="emitCustomEvent('feature_flag', {flag: 'new_checkout', enabled: true, variant: 'B'})">
+    Feature Flag Event
+  </button>
+</div>
+
+<div id="custom-event-log" style="font-family: monospace; font-size: 0.85rem; color: #6f42c1; min-height: 1.5rem;"></div>
+
+<script>
+  var customLog = document.getElementById('custom-event-log');
+  function emitCustomEvent(tag, payload) {
+    if (window.Sentiero && window.Sentiero.addCustomEvent) {
+      window.Sentiero.addCustomEvent(tag, payload);
+      var line = document.createElement('div');
+      line.textContent = '[' + new Date().toLocaleTimeString() + '] Emitted: ' + tag + ' ' + JSON.stringify(payload);
+      customLog.prepend(line);
+    } else {
+      var line = document.createElement('div');
+      line.textContent = '[' + new Date().toLocaleTimeString() + '] Sentiero not loaded yet';
+      customLog.prepend(line);
+    }
+  }
+</script>
+
+<hr>
+
+<h2>Declarative Custom Events</h2>
+<p>With <code>track_custom_events: true</code>, elements with <code>data-sentiero-track-{event}</code> attributes automatically fire rrweb custom events. No JavaScript required.</p>
+
+<div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+  <button type="button" data-sentiero-track-click="signup_clicked">
+    Declarative Click
+  </button>
+  <button type="button" data-sentiero-track-click="plan_selected" data-sentiero-data='{"plan":"pro","price":29}'>
+    Choose Pro (with payload)
+  </button>
+</div>
+
+<div style="margin-bottom: 1rem;">
+  <label for="declarative-select">Declarative Change:</label>
+  <select id="declarative-select" data-sentiero-track-change="filter_changed">
+    <option value="">Choose...</option>
+    <option value="newest">Newest</option>
+    <option value="popular">Most Popular</option>
+  </select>
+</div>
+
+<div style="margin-bottom: 1rem;">
+  <label for="declarative-focus">Declarative Focus/Blur:</label>
+  <input type="text" id="declarative-focus" data-sentiero-track-focus="search_focused" data-sentiero-track-blur="search_blurred" placeholder="Focus and blur me">
+</div>
+
+<hr>
+
+<h2>Navigation Tracking</h2>
+<p>With <code>track_navigation: true</code>, clicks on links are automatically logged as custom events before the browser navigates away. This captures where the user went,  even to external sites.</p>
+
+<div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+  <a href="https://github.com" target="_blank">External Link (GitHub)</a>
+  | <a href="https://google.com" target="_blank">External Link (Google)</a>
+</div>
+
+<hr>
+
+<p><a href="/" id="reload-link">Reload</a> | <a href="/unmasking">Unmasking test page</a> | <a href="/sentiero/">Dashboard</a></p>

@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: StandardRB
+        run: bundle exec standardrb
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: Bundle Audit
+        run: bundle exec bundle-audit check --update
+
+  test:
+    name: "Tests (Ruby ${{ matrix.ruby }})"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: ["3.3", "3.4", "4.0"]
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          bundler-cache: true
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Run core tests
+        env:
+          COVERAGE: "1"
+          REDIS_URL: redis://localhost:6379/0
+        run: bundle exec rake test
+      - name: Run Rails tests
+        env:
+          COVERAGE: "1"
+        run: bundle exec rake test:rails
+      - name: Upload coverage artifact
+        if: matrix.ruby == '3.3'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+
+  system:
+    name: System (Capybara + Chrome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - uses: browser-actions/setup-chrome@v1
+        id: setup-chrome
+        with:
+          chrome-version: stable
+      - name: Run system tests (real browser)
+        env:
+          SENTIERO_TEST_CHROME: ${{ steps.setup-chrome.outputs.chrome-path }}
+        run: bundle exec rake test:system
+
+  rubycritic:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - name: RubyCritic
+        run: |
+          bundle exec rubycritic lib/sentiero \
+            --no-browser \
+            --format console \
+            --minimum-score 80
+
+  frontend:
+    name: Frontend (JS unit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install deps
+        working-directory: frontend
+        run: npm ci
+      - name: JS unit tests
+        working-directory: frontend
+        run: npm test
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+      - name: Install e2e deps
+        working-directory: e2e
+        run: npm ci
+      - name: Install Playwright Chromium
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium
+      - name: Run e2e (boots demo on :9393)
+        working-directory: e2e
+        run: npm test
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/

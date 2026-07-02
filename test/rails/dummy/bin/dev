@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+export RAILS_ENV="${RAILS_ENV:-development}"
+
+PORT="${PORT:-3001}"
+
+echo "==> Booting Sentiero dummy app (${RAILS_ENV})"
+echo "    http://localhost:${PORT}"
+echo ""
+echo "    Pages:"
+echo "      /            ,  Home (basic recording)"
+echo "      /unmasking   ,  Selective unmasking demo"
+echo "      /sentiero/   ,  Dashboard (session list + replay)"
+echo ""
+
+bundle exec rackup config.ru -p "$PORT" -o 0.0.0.0

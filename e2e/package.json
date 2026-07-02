@@ -1,0 +1,12 @@
+{
+  "name": "sentiero-e2e",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Playwright end-to-end tests driving the Sentiero demo app in a real browser.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

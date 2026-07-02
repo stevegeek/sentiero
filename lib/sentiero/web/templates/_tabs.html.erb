@@ -1,0 +1,10 @@
+<nav class="tabs" aria-label="Section tabs">
+  <% tabs.each do |t| -%>
+    <a href="<%= view.h(t[:href]) %>"
+       class="tab <%= t[:active] ? "tab-active" : "" %>"
+       <%= t[:active] ? 'aria-current="page"' : "" %>>
+      <%= view.h(t[:label]) %>
+      <% if t[:count] -%><span class="tab-count"><%= t[:count] %></span><% end -%>
+    </a>
+  <% end -%>
+</nav>

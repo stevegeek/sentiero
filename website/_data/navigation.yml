@@ -1,0 +1,12 @@
+- title: Guide
+  url: /guide/introduction/
+  collections:
+    - getting_started
+    - recording
+    - analytics
+    - setup
+    - frameworks
+- title: GitHub
+  url: https://github.com/stevegeek/sentiero
+- title: RubyGems
+  url: https://rubygems.org/gems/sentiero

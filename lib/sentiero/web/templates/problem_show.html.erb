@@ -1,0 +1,200 @@
+<div class="card mb-3">
+  <div class="flex items-center gap-2 px-4 py-2.5">
+    <a href="<%= view.h(view.base_path) %>/issues" class="btn btn-sm btn-secondary shrink-0">&larr; Back</a>
+    <div class="w-px h-4 bg-gray-200 shrink-0"></div>
+    <span class="badge badge-neutral shrink-0"><%= view.h(view.problem[:exception_class].to_s) %></span>
+    <% case view.problem[:status]
+       when "resolved" -%>
+      <span class="badge badge-success shrink-0">resolved</span>
+    <% when "ignored" -%>
+      <span class="badge badge-neutral shrink-0">ignored</span>
+    <% else -%>
+      <span class="badge badge-danger shrink-0">open</span>
+    <% end -%>
+    <span class="badge badge-neutral shrink-0"><%= view.problem[:count] %> occurrence<%= view.problem[:count] == 1 ? "" : "s" %></span>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h5 class="text-sm font-semibold text-gray-800 mb-2"><%= view.h(view.problem[:title].to_s) %></h5>
+    <div class="grid grid-cols-[100px_1fr] gap-x-4 gap-y-2 mt-3">
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Project</div>
+      <div class="text-xs text-gray-600"><%= view.h(view.problem[:project].to_s) %></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">First seen</div>
+      <div class="text-xs text-gray-600"><%= view.problem[:first_seen] ? Time.at(view.problem[:first_seen]).utc.strftime("%b %d, %Y %H:%M:%S UTC") : "N/A" %></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Last seen</div>
+      <div class="text-xs text-gray-600"><%= view.problem[:last_seen] ? Time.at(view.problem[:last_seen]).utc.strftime("%b %d, %Y %H:%M:%S UTC") : "N/A" %></div>
+
+      <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Fingerprint</div>
+      <div class="text-xs text-gray-600 font-mono"><%= view.h(view.problem[:id].to_s) %></div>
+
+      <% if view.problem[:resolved_at] -%>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Resolved at</div>
+        <div class="text-xs text-gray-600"><%= Time.at(view.problem[:resolved_at]).utc.strftime("%b %d, %Y %H:%M UTC") %></div>
+      <% end -%>
+    </div>
+
+    <hr class="my-4 border-gray-100">
+    <h6 class="text-xs font-semibold text-gray-700 mb-3 uppercase tracking-wider">Update Status</h6>
+    <form method="post" action="<%= view.h(view.base_path) %>/issues/<%= view.h(view.problem[:id]) %>/status" class="flex gap-2 flex-wrap">
+      <input type="hidden" name="csrf_token" value="<%= view.h(view.csrf_token) %>">
+      <% unless view.problem[:status] == "open" -%>
+        <button type="submit" name="status" value="open" class="btn btn-sm btn-secondary">Reopen</button>
+      <% end -%>
+      <% unless view.problem[:status] == "resolved" -%>
+        <button type="submit" name="status" value="resolved" class="btn btn-sm btn-primary">Resolve</button>
+      <% end -%>
+      <% unless view.problem[:status] == "ignored" -%>
+        <button type="submit" name="status" value="ignored" class="btn btn-sm btn-secondary">Ignore</button>
+      <% end -%>
+    </form>
+  </div>
+</div>
+
+<% unless view.session_summaries.empty? -%>
+  <div class="card mb-3">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 mb-3 uppercase tracking-wider">Sessions Affected (<%= view.session_summaries.size %>)</h6>
+      <ul class="space-y-2">
+        <% view.session_summaries.each do |s| -%>
+          <li class="flex items-center gap-3 text-xs">
+            <a href="<%= view.replay_href(s) %>" class="text-blue-600 hover:text-blue-800 font-mono shrink-0"><%= view.h(s[:session_id]) %></a>
+            <% if s[:last_event_at] && s[:first_event_at] -%>
+              <span class="text-gray-400 shrink-0"><%= view.h(view.format_duration(s[:first_event_at], s[:last_event_at])) %></span>
+            <% end -%>
+            <% if s[:browser] -%>
+              <span class="text-gray-500 truncate"><%= view.h(s[:browser]) %></span>
+            <% end -%>
+          </li>
+        <% end -%>
+      </ul>
+    </div>
+  </div>
+<% end -%>
+
+<%# B4 occurrence trend: exact 24h/7d/30d counts + a per-UTC-day sparkline
+    over the occurrences fetched for this page. -%>
+<div class="card mb-3">
+  <div class="card-body">
+    <h6 class="text-xs font-semibold text-gray-800 mb-3 uppercase tracking-wider">Occurrence Trend</h6>
+    <div class="flex items-center gap-2 mb-3 flex-wrap">
+      <span class="badge badge-neutral">24h&nbsp;<span class="tabular-nums" data-trend-24h="<%= view.trend[:last_24h] %>"><%= view.trend[:last_24h] %></span></span>
+      <span class="badge badge-neutral">7d&nbsp;<span class="tabular-nums" data-trend-7d="<%= view.trend[:last_7d] %>"><%= view.trend[:last_7d] %></span></span>
+      <span class="badge badge-neutral">30d&nbsp;<span class="tabular-nums" data-trend-30d="<%= view.trend[:last_30d] %>"><%= view.trend[:last_30d] %></span></span>
+    </div>
+    <% if view.spark_max == 0 -%>
+      <p class="text-gray-400 text-xs py-4 text-center">No occurrences in the last 30 days.</p>
+    <% else -%>
+      <div class="stats-chart">
+        <% view.trend[:series].each do |day| -%>
+          <div class="stats-chart-col">
+            <div class="stats-chart-bar-wrapper">
+              <div class="stats-chart-bar" style="height: <%= (day[:count].to_f / view.spark_max * 100).round %>%" title="<%= view.h(day[:date]) %>: <%= day[:count] %> occurrence<%= day[:count] == 1 ? "" : "s" %>" data-spark-count="<%= day[:count] %>"></div>
+            </div>
+            <div class="stats-chart-label"><%= view.h(day[:date][-5..]) %></div>
+          </div>
+        <% end -%>
+      </div>
+      <div class="text-[10px] text-gray-400 mt-1">By UTC day &mdash; latest <%= view.trend[:sample_size] %> occurrences.</div>
+    <% end -%>
+  </div>
+</div>
+
+<% if view.has_facets? -%>
+  <div class="card mb-3" data-problem-facets>
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 mb-3 uppercase tracking-wider">Facets
+        <span class="font-normal normal-case tracking-normal text-gray-400">&mdash; latest <%= view.facets[:sample_size] %> occurrences</span>
+      </h6>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <% view.facet_groups.each do |title, rows| -%>
+          <% next if rows.empty? -%>
+          <div>
+            <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5"><%= view.h(title) %></div>
+            <table class="w-full text-xs">
+              <% rows.each do |value, count| -%>
+                <tr class="border-b border-gray-100 last:border-0">
+                  <td class="py-1 text-gray-700 truncate max-w-0 w-full"><%= view.h(value) %></td>
+                  <td class="py-1 pl-2 text-right text-gray-500 tabular-nums" data-facet-count="<%= count %>"><%= count %></td>
+                </tr>
+              <% end -%>
+            </table>
+          </div>
+        <% end -%>
+        <% unless view.facets[:releases].empty? -%>
+          <div>
+            <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">Releases</div>
+            <table class="w-full text-xs">
+              <% view.facets[:releases].each do |release, info| -%>
+                <tr class="border-b border-gray-100 last:border-0">
+                  <td class="py-1 text-gray-700 truncate max-w-0 w-full">
+                    <%= view.h(release) %>
+                    <% if info[:first_seen] -%>
+                      <span class="text-[10px] text-gray-400">&middot; first seen <%= Time.at(info[:first_seen]).utc.strftime("%b %d, %H:%M") %></span>
+                    <% end -%>
+                  </td>
+                  <td class="py-1 pl-2 text-right text-gray-500 tabular-nums" data-facet-count="<%= info[:count] %>"><%= info[:count] %></td>
+                </tr>
+              <% end -%>
+            </table>
+          </div>
+        <% end -%>
+      </div>
+    </div>
+  </div>
+<% end -%>
+
+<% unless view.occurrences.empty? -%>
+  <div class="card">
+    <div class="card-body">
+      <h6 class="text-xs font-semibold text-gray-800 mb-3 uppercase tracking-wider">Recent Occurrences</h6>
+      <div class="space-y-4">
+        <% view.occurrences.each do |occ| -%>
+          <div class="border border-gray-100 rounded p-3">
+            <div class="flex items-start justify-between gap-2 mb-2">
+              <div class="text-xs text-gray-700 font-medium flex-1"><%= view.h(occ["message"].to_s) %></div>
+              <div class="text-[10px] text-gray-400 shrink-0 tabular-nums">
+                <%= occ["timestamp"] ? Time.at(occ["timestamp"].to_f).utc.strftime("%b %d, %H:%M:%S") : "N/A" %>
+              </div>
+            </div>
+            <% if occ["session_id"] && !occ["session_id"].empty? -%>
+              <div class="text-[10px] text-gray-400 mb-2">
+                Session:
+                <% if occ["window_id"] && !occ["window_id"].empty? -%>
+                  <a href="<%= view.h(view.base_path) %>/sessions/<%= view.h(occ["session_id"]) %>/windows/<%= view.h(occ["window_id"]) %>?t=<%= (occ["timestamp"].to_f * 1000).to_i %>" class="text-blue-500 hover:text-blue-700 font-mono"><%= view.h(occ["session_id"]) %></a>
+                <% else -%>
+                  <a href="<%= view.h(view.base_path) %>/sessions/<%= view.h(occ["session_id"]) %>" class="text-blue-500 hover:text-blue-700 font-mono"><%= view.h(occ["session_id"]) %></a>
+                <% end -%>
+              </div>
+            <% end -%>
+            <% if occ["backtrace"] && !occ["backtrace"].empty? -%>
+              <pre class="text-[10px] text-gray-500 bg-gray-50 rounded p-2 overflow-x-auto whitespace-pre-wrap"><%= view.h(Array(occ["backtrace"]).first(20).join("\n")) %></pre>
+            <% end -%>
+            <% ctx = occ["context"]
+               if ctx.is_a?(Hash) && !ctx.empty? -%>
+              <details class="mt-2">
+                <summary class="text-[10px] font-medium text-gray-500 cursor-pointer select-none">Context</summary>
+                <div class="grid grid-cols-[140px_1fr] gap-x-3 gap-y-0.5 mt-1.5 bg-gray-50 rounded p-2">
+                  <% ctx.each do |k, v| -%>
+                    <% if v.is_a?(Hash) -%>
+                      <% v.each do |sk, sv| -%>
+                        <div class="text-[10px] text-gray-400 font-mono pt-0.5 truncate"><%= view.h("#{k}.#{sk}") %></div>
+                        <div class="text-[10px] text-gray-700 break-all"><%= view.h(sv.is_a?(Hash) || sv.is_a?(Array) ? sv.to_json : sv.to_s) %></div>
+                      <% end -%>
+                    <% else -%>
+                      <div class="text-[10px] text-gray-400 font-mono pt-0.5 truncate"><%= view.h(k.to_s) %></div>
+                      <div class="text-[10px] text-gray-700 break-all"><%= view.h(v.is_a?(Hash) || v.is_a?(Array) ? v.to_json : v.to_s) %></div>
+                    <% end -%>
+                  <% end -%>
+                </div>
+              </details>
+            <% end -%>
+          </div>
+        <% end -%>
+      </div>
+    </div>
+  </div>
+<% end -%>

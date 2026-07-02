@@ -1,0 +1,114 @@
+<%= view.render_partial("_analytics_nav.html.erb", active: :segments, since: view.filters[:since_param].to_s, until_str: view.filters[:until_param].to_s) %>
+<h1 class="page-title">Segments</h1>
+
+<form method="get" action="<%= view.h(view.base_path) %>/analytics/segments">
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="flex items-end gap-3 flex-wrap">
+        <div class="shrink-0">
+          <label for="browser" class="label">Browser</label>
+          <select name="browser" id="browser" class="select" style="width:8rem">
+            <option value="">Any</option>
+            <% view.browser_options.each do |b| -%>
+              <option value="<%= view.h(b) %>" <%= view.filters[:browser] == b ? "selected" : "" %>><%= view.h(b) %></option>
+            <% end -%>
+          </select>
+        </div>
+        <div class="shrink-0">
+          <label for="device" class="label">Device</label>
+          <select name="device" id="device" class="select" style="width:8rem">
+            <option value="">Any</option>
+            <% view.device_options.each do |d| -%>
+              <option value="<%= view.h(d) %>" <%= view.filters[:device] == d ? "selected" : "" %>><%= view.h(d) %></option>
+            <% end -%>
+          </select>
+        </div>
+        <div class="shrink-0">
+          <label for="url_pattern" class="label">URL pattern</label>
+          <input type="text" name="url_pattern" id="url_pattern" class="input" style="width:12rem" value="<%= view.h(view.filters[:url_pattern].to_s) %>" placeholder="substring or *glob*">
+        </div>
+      </div>
+
+      <div class="flex items-end gap-3 flex-wrap mt-3">
+        <div class="shrink-0">
+          <label for="metadata_key" class="label">Metadata key</label>
+          <input type="text" name="metadata_key" id="metadata_key" class="input" style="width:9rem" value="<%= view.h(view.filters[:metadata_key].to_s) %>">
+        </div>
+        <div class="shrink-0">
+          <label for="metadata_value" class="label">Metadata value</label>
+          <input type="text" name="metadata_value" id="metadata_value" class="input" style="width:9rem" value="<%= view.h(view.filters[:metadata_value].to_s) %>">
+        </div>
+        <div class="shrink-0">
+          <label for="metadata_match" class="label">Match</label>
+          <select name="metadata_match" id="metadata_match" class="select" style="width:7rem">
+            <option value="exact" <%= view.filters[:metadata_match] == "exact" ? "selected" : "" %>>exact</option>
+            <option value="contains" <%= view.filters[:metadata_match] == "contains" ? "selected" : "" %>>contains</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="flex items-end gap-3 flex-wrap mt-3">
+        <%= view.render_partial("_date_range.html.erb",
+          since: view.filters[:since_param].to_s, until_str: view.filters[:until_param].to_s) %>
+        <div class="shrink-0">
+          <label for="min_duration" class="label">Min duration (s)</label>
+          <input type="number" min="0" name="min_duration" id="min_duration" class="input" style="width:8rem" value="<%= view.filters[:min_duration_ms] ? view.filters[:min_duration_ms] / 1000 : "" %>">
+        </div>
+        <div class="shrink-0">
+          <label for="max_duration" class="label">Max duration (s)</label>
+          <input type="number" min="0" name="max_duration" id="max_duration" class="input" style="width:8rem" value="<%= view.filters[:max_duration_ms] ? view.filters[:max_duration_ms] / 1000 : "" %>">
+        </div>
+        <div class="shrink-0 flex items-center gap-1.5 self-end pb-1.5">
+          <input type="checkbox" name="has_errors" id="has_errors" value="true" class="checkbox" <%= view.filters[:has_errors] ? "checked" : "" %>>
+          <label for="has_errors" class="label mb-0">Has errors</label>
+        </div>
+        <div class="shrink-0 flex items-center gap-1.5">
+          <button type="submit" class="btn btn-primary">Filter</button>
+          <a href="<%= view.h(view.base_path) %>/analytics/segments" class="btn btn-secondary">Clear</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "matching sessions") %>
+
+<% if view.sessions.empty? -%>
+  <div class="card">
+    <div class="text-center py-10 px-6 text-gray-400 text-xs">
+      No sessions matched this filter.
+    </div>
+  </div>
+<% else -%>
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Session ID</th>
+          <th>Page</th>
+          <th>Device</th>
+          <th>Windows</th>
+          <th>Events</th>
+          <th>Duration</th>
+          <th>Last Activity</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% view.sessions.each do |s| -%>
+          <%= view.render_session_row(s, false) %>
+        <% end -%>
+      </tbody>
+    </table>
+  </div>
+
+  <nav aria-label="Segment pagination" class="mt-3">
+    <ul class="pagination">
+      <li class="<%= 'page-disabled' if view.page <= 1 %>">
+        <a class="page-link" href="<%= view.h(view.base_path) %>/analytics/segments?<%= view.h(view.filter_query) %>&amp;per_page=<%= view.per_page %>&amp;page=<%= view.page - 1 %>">Previous</a>
+      </li>
+      <li class="<%= 'page-disabled' unless view.has_next %>">
+        <a class="page-link" href="<%= view.h(view.base_path) %>/analytics/segments?<%= view.h(view.filter_query) %>&amp;per_page=<%= view.per_page %>&amp;page=<%= view.page + 1 %>">Next</a>
+      </li>
+    </ul>
+  </nav>
+<% end -%>
