@@ -66,4 +66,69 @@ class FingerprintTest < Minitest::Test
       Sentiero::Fingerprint.compute(exception_class: "E", backtrace: [evil], project: "app")
     end
   end
+
+  def test_default_normalizer_matches_explicit_ruby_normalizer
+    default = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14:in `f'"], project: "app")
+    explicit = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14:in `f'"], project: "app", normalizer: Sentiero::Fingerprint::RUBY_NORMALIZER)
+    assert_equal explicit, default
+  end
+
+  def test_ruby_normalizer_collapses_line_numbers
+    a = Sentiero::Fingerprint::RUBY_NORMALIZER.call("app.rb:42:in 'm'")
+    b = Sentiero::Fingerprint::RUBY_NORMALIZER.call("app.rb:9:in 'm'")
+    assert_equal a, b
+  end
+
+  def test_crystal_normalizer_collapses_line_and_line_col_forms
+    a = Sentiero::Fingerprint::CRYSTAL_NORMALIZER.call("src/app.cr:451 in 'a'")
+    b = Sentiero::Fingerprint::CRYSTAL_NORMALIZER.call("src/app.cr:5:3 in 'a'")
+    assert_equal a, b
+  end
+
+  def test_crystal_normalizer_differs_from_ruby_normalizer_on_same_input
+    frame = "src/app.cr:451 in 'a'"
+    refute_equal Sentiero::Fingerprint::RUBY_NORMALIZER.call(frame), Sentiero::Fingerprint::CRYSTAL_NORMALIZER.call(frame)
+  end
+
+  def test_generic_normalizer_strips_trailing_line_and_line_col_only
+    assert_equal "app.py:N", Sentiero::Fingerprint::GENERIC_NORMALIZER.call("app.py:42")
+    assert_equal "app.py:N", Sentiero::Fingerprint::GENERIC_NORMALIZER.call("app.py:42:7")
+    # Coarse by design: no `in`-token assumption, so it cannot see line noise
+    # that isn't at the end of the frame.
+    assert_equal "app.rb:42:in 'm'", Sentiero::Fingerprint::GENERIC_NORMALIZER.call("app.rb:42:in 'm'")
+  end
+
+  def test_all_builtin_normalizers_strip_memory_addresses
+    [Sentiero::Fingerprint::RUBY_NORMALIZER, Sentiero::Fingerprint::CRYSTAL_NORMALIZER, Sentiero::Fingerprint::GENERIC_NORMALIZER].each do |normalizer|
+      assert_equal "#<Obj:0xHEX>", normalizer.call("#<Obj:0x00007fa1b2>")
+    end
+  end
+
+  def test_compute_accepts_custom_normalizer
+    upcasing = ->(frame) { frame.upcase }
+    fp = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14"], project: "app", normalizer: upcasing)
+    expected = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["APP/X.RB:14"], project: "app", normalizer: upcasing)
+    assert_equal expected, fp
+  end
+
+  def test_compute_falls_back_to_raw_capped_frame_when_normalizer_raises
+    raising = ->(_frame) { raise "boom" }
+    with_raise = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14"], project: "app", normalizer: raising)
+    identity = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14"], project: "app", normalizer: ->(f) { f })
+    assert_equal identity, with_raise
+  end
+
+  def test_compute_coerces_non_string_normalizer_result
+    to_int = ->(_frame) { 12345 }
+    fp = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14"], project: "app", normalizer: to_int)
+    expected = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14"], project: "app", normalizer: ->(_f) { "12345" })
+    assert_equal expected, fp
+  end
+
+  def test_compute_re_truncates_and_caps_oversized_normalizer_result
+    exploding = ->(_frame) { "x" * (Sentiero::Fingerprint::MAX_FRAME_LENGTH * 2) }
+    fp = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["short"], project: "app", normalizer: exploding)
+    expected = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["short"], project: "app", normalizer: ->(_f) { "x" * Sentiero::Fingerprint::MAX_FRAME_LENGTH })
+    assert_equal expected, fp
+  end
 end
