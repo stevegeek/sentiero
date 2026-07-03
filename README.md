@@ -19,7 +19,9 @@ Captures user interactions via [rrweb](https://www.rrweb.io/), stores them serve
 
 Similar to [SpectatorSport](https://github.com/bensheldon/spectator_sport) by Ben Sheldon but not bound to Rails.
 
-📖 **Full documentation: [sentiero.app](https://sentiero.app)**
+**Full documentation: [sentiero.app](https://www.sentiero.app)**
+
+**Demo: [demo.sentiero.app](https://demo.sentiero.app)** (login to dashboard with `demo`/`demo`)
 
 ### Why Sentiero?
 
