@@ -12,6 +12,23 @@ import { test as base, expect } from "@playwright/test";
  * NOT modify the demo app itself.
  */
 export const test = base.extend({
+  /**
+   * The demo is consent-first: the recorder script tag renders only when the
+   * `sentiero_demo_consent=granted` cookie is present (see demo/views/layout.erb).
+   * Pre-grant it for every test so recording starts on first load, as the
+   * recording specs assume. consent-banner.spec.ts clears cookies to exercise
+   * the pre-consent path.
+   */
+  context: async ({ context, baseURL }, use) => {
+    await context.addCookies([
+      {
+        name: "sentiero_demo_consent",
+        value: "granted",
+        url: baseURL ?? "http://localhost:9393",
+      },
+    ]);
+    await use(context);
+  },
   page: async ({ page }, use) => {
     await page.route(/cdn\.tailwindcss\.com/, (route) => route.abort());
     await use(page);
@@ -28,14 +45,14 @@ const DASHBOARD = "/sentiero/dashboard/";
 /**
  * Navigate to the demo's todo app and wait for it to render.
  *
- * The demo was restructured into a marketing funnel: "/" is now the
- * scrollable landing page ("Trailhead") and the todo app that most recording
- * specs interact with (the `input[name="text"]` + Add form, the masked/blocked
- * privacy-demo sections, the JS-error trigger, the opt-out toggle) moved to
- * "/app". A fresh session (no signup) always renders the "Todo List" heading.
+ * The todo app that most recording specs interact with (the
+ * `input[name="text"]` + Add form, the masked/blocked privacy-demo sections,
+ * the error triggers, the opt-out toggle) is the front page; the scrollable
+ * marketing page the scroll/heatmap specs use lives at "/landing". A fresh
+ * session (no signup) always renders the "Todo List" heading.
  */
 export async function gotoApp(page: Page): Promise<void> {
-  await page.goto("/app", { waitUntil: "domcontentloaded" });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Todo List" })).toBeVisible();
 }
 
