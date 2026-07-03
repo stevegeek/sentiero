@@ -4,6 +4,10 @@ module Sentiero
   class Configuration
     attr_reader :store
 
+    # Reader-only: mutate via #register / #default_platform=, not by
+    # replacing the whole object.
+    attr_reader :fingerprint
+
     attr_accessor :cors_origins,
       :auth_callback,
       :flush_interval_ms,
@@ -156,6 +160,7 @@ module Sentiero
       @session_idle_timeout = DEFAULT_SESSION_IDLE_TIMEOUT
       @session_max_age = DEFAULT_SESSION_MAX_AGE
       @redaction = Sentiero::Redaction::Config.new
+      @fingerprint = Sentiero::Fingerprint::Config.new
       @anonymize_ip = true
       @geo_source = nil
       @audit_log = nil
