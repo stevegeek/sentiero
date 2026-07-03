@@ -113,6 +113,19 @@ mount Sentiero::Web::EventsApp.new => "/sentiero/events"
 mount Sentiero::Web::DashboardApp.new => "/sentiero"
 ```
 
+Two mounts are all you need: `DashboardApp` is the single dashboard entry
+point and internally dispatches `/analytics/*`, `/issues/*`, `/custom-events/*`,
+`/assets/*`, and `/recorder.js`. Don't mount `AnalyticsApp` or `MonitoringApp`
+at their own paths alongside it — that creates routing conflicts.
+
+> **Behind a reverse proxy?** Mount Sentiero at the same path the proxy
+> forwards, and don't strip the prefix: the dashboard builds its links from
+> Rack's `SCRIPT_NAME`, which `map`/`mount` set. With a prefix-stripping proxy
+> (Caddy's `handle_path`, nginx `proxy_pass` with a trailing slash),
+> `SCRIPT_NAME` stays empty and every internal link points at the root. Use
+> Caddy's `handle` (not `handle_path`) / nginx `proxy_pass` without a URI, and
+> keep the `map("/sentiero")` in your config.ru.
+
 ### 3. Add the Recording Script
 
 Include in your HTML layout (before `</body>`):
