@@ -50,6 +50,11 @@ module Sentiero
         })
       end
 
+      def save_session_with_metadata(id, metadata)
+        @store.save_events(Sentiero::WindowRef.new(id, "w1"), [{"type" => 3, "timestamp" => now_ms}])
+        @store.save_metadata(id, metadata)
+      end
+
       def test_overview_returns_200
         get "/analytics"
 
@@ -101,6 +106,26 @@ module Sentiero
         assert_includes last_response.body, "example.com/home"
         assert_includes last_response.body, "google.com"
         assert_includes last_response.body, "click"
+      end
+
+      def test_overview_shows_countries_card_when_geo_data_present
+        save_session_with_metadata("s-geo", {"geo_country" => "DE", "geo_city" => "Berlin"})
+
+        get "/analytics"
+
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, "Countries"
+        assert_includes last_response.body, "DE"
+        assert_includes last_response.body, "Berlin"
+      end
+
+      def test_overview_hides_countries_card_without_geo_data
+        save_session_with_metadata("s-plain", {"plan" => "pro"})
+
+        get "/analytics"
+
+        assert_equal 200, last_response.status
+        refute_includes last_response.body, ">Countries<"
       end
 
       def test_overview_renders_error_stat_cards_with_links
