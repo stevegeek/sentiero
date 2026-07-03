@@ -57,6 +57,8 @@ module Sentiero
           else
             not_found
           end
+        when "/maintenance"
+          get_only(method) || handle_maintenance(env)
         when %r{\A/custom-events(?:/.*)?\z}
           Sentiero::Web::MonitoringApp.new.call(env)
         when %r{\A/issues(?:/.*)?\z}
@@ -230,6 +232,16 @@ module Sentiero
           end
           redirect("#{base_path(env)}/")
         end
+      end
+
+      def handle_maintenance(env)
+        params = query_params(env)
+        purged = params["purged"]&.then { |v| v.match?(/\A\d+\z/) ? v.to_i : nil }
+        render_page(env, Views::MaintenanceView.new(
+          retention_period: Sentiero.configuration.retention_period,
+          purged: purged,
+          error: params["error"]
+        ), request_path: "/maintenance")
       end
     end
   end
