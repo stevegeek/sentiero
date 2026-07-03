@@ -13,7 +13,10 @@ module Sentiero
       end
 
       def call(env)
-        path = env["PATH_INFO"] || "/"
+        # Rack::Builder#map "/sentiero" leaves PATH_INFO empty (not "/") for a
+        # request to the bare mount point; treat it as the index.
+        path = env["PATH_INFO"]
+        path = "/" if path.nil? || path.empty?
         method = env["REQUEST_METHOD"]
 
         # Static assets are served before auth: they carry no session data, and
@@ -21,6 +24,12 @@ module Sentiero
         if (asset_path = path[%r{\A/assets/(.+)\z}, 1])
           return handle_asset(asset_path)
         end
+
+        # Stable alias for the content-hashed recorder bundle, so pages outside
+        # the Ruby helpers (static HTML) can hardcode one URL that survives
+        # rebuilds. Sibling of the /events mount, so the recorder's
+        # currentScript fallback derives eventsUrl correctly from it.
+        return handle_recorder_alias if path == "/recorder.js"
 
         return unauthorized_response unless authorized?(env)
 
@@ -60,6 +69,17 @@ module Sentiero
       end
 
       private
+
+      def handle_recorder_alias
+        filename = Manifest.manifest["recorder"]
+        return not_found unless filename
+
+        status, headers, body = handle_asset(filename)
+        # The alias serves new bundle contents after an upgrade, so it must not
+        # inherit the fingerprinted file's year-long immutable cache.
+        headers["cache-control"] = "public, max-age=300" if status == 200
+        [status, headers, body]
+      end
 
       def qs_url(path, env)
         qs = env["QUERY_STRING"]

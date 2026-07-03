@@ -120,6 +120,25 @@ module Sentiero
       assert_match %r{<a class="s-nav-item active"[^>]*href="[^"]*/issues">}, body
     end
 
+    def test_stable_recorder_url_serves_the_hashed_bundle
+      # /sentiero/recorder.js is the stable alias for the content-hashed
+      # recorder bundle: static pages hardcode it, and the recorder's
+      # currentScript fallback derives the sibling /sentiero/events from it.
+      get "/sentiero/recorder.js"
+      assert_equal 200, last_response.status
+      assert_includes last_response.headers["content-type"], "javascript"
+      # The same URL serves new bundles after an upgrade, so it must not
+      # carry the fingerprinted assets' immutable cache header.
+      refute_includes last_response.headers["cache-control"].to_s, "immutable"
+    end
+
+    def test_dashboard_reachable_at_mount_point_without_trailing_slash
+      # Rack::Builder#map "/sentiero" sets PATH_INFO="" (empty, not "/") for a
+      # request to bare /sentiero; the router must treat that as the index.
+      get "/sentiero"
+      assert_equal 200, last_response.status
+    end
+
     def test_dashboard_index_and_replay_reachable_in_combined_mount
       post "/sentiero/events",
         JSON.generate({"sessionId" => "sess_c", "windowId" => "win_1",

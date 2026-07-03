@@ -34,6 +34,14 @@ module Sentiero
         assert_equal 200, last_response.status
       end
 
+      def test_recorder_js_is_served_without_credentials
+        # Like /assets/*, the stable recorder alias carries no session data and
+        # must be loadable by recorded pages that never see dashboard auth.
+        Sentiero.configuration.basic_auth = {user: "admin", password: "pw"}
+        get "/recorder.js"
+        assert_equal 200, last_response.status
+      end
+
       def test_missing_credentials_return_401_with_challenge
         Sentiero.configuration.basic_auth = {user: "admin", password: "pw"}
         get "/"
