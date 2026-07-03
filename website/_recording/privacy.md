@@ -302,15 +302,45 @@ Drop sessions past a retention window. `retention_period` is an integer number o
 config.retention_period = 30 * 24 * 60 * 60 # 30 days
 ```
 
-`Sentiero.purge_expired!` deletes everything older than the window and returns the count (a no-op returning `nil` when `retention_period` is unset). It calls `Store#purge_older_than(seconds)`, which every backend implements. Run it from a scheduler (non-Rails) or the rake task (Rails):
+`Sentiero.purge_expired!` deletes everything older than the window and returns the count (a no-op returning `nil` when `retention_period` is unset). It calls `Store#purge_older_than(seconds)`, which every backend implements.
+
+Run it on a schedule. **Rails**: the engine ships a rake task — point cron (or `whenever`, `solid_queue`, etc.) at it:
+
+```
+0 3 * * * cd /srv/myapp && bundle exec rake sentiero:purge >> log/sentiero_purge.log 2>&1
+```
+
+**Standalone Rack**: there is no rake task; the purge just needs your Sentiero configuration, not the web app. Keep the `Sentiero.configure` block in a boot file that both `config.ru` and a runner script require:
 
 ```ruby
-Sentiero.purge_expired!
+# config/sentiero.rb — required by config.ru AND bin/sentiero_purge
+require "sentiero"
+require "sentiero/stores/sqlite"
+
+Sentiero.configure do |config|
+  config.store = Sentiero::Stores::SQLite.new(path: "sentiero.db")
+  config.retention_period = 90 * 86_400 # 90 days
+end
 ```
 
-```bash
-rake sentiero:purge
+```ruby
+#!/usr/bin/env ruby
+# bin/sentiero_purge
+require "bundler/setup"
+require_relative "../config/sentiero"
+
+deleted = Sentiero.purge_expired!
+abort "sentiero: retention_period not set, nothing purged" if deleted.nil?
+puts "sentiero: purged #{deleted} session(s)"
 ```
+
+```
+0 3 * * * cd /srv/myapp && bundle exec ruby bin/sentiero_purge >> log/sentiero_purge.log 2>&1
+```
+
+A systemd timer invoking the same script is equivalent. The Redis store's `:ttl` option expires data independently and can be used alongside purge.
+
+You can also purge on demand from the dashboard's **Maintenance** page — run the retention purge now, or delete everything recorded on/before a chosen date.
 
 Purge is destructive and irreversible.
 

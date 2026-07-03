@@ -16,7 +16,7 @@ A pre-deployment checklist. Each row links to the page that owns the detail.
 | **Dashboard auth** | Set `basic_auth` or `auth_callback`. See [Authentication](/guide/authentication/). |
 | **Store** | Pick a backend for your traffic and topology. See [Storage](/guide/storage/). |
 | **Resource limits** | Set `max_sessions` and `max_events_per_session` to cap memory/storage growth. See [Configuration](/guide/configuration/). |
-| **Retention** | Set `retention_period` and schedule purges. See [Privacy](/guide/privacy/). |
+| **Retention** | Set `retention_period` and schedule purges from a scheduler ([cron recipes](/guide/privacy/#data-retention--purge)); one-off purges can be run from the dashboard's Maintenance page. See [Privacy](/guide/privacy/). |
 | **CORS** | Set `cors_origins` to your frontend's actual origin(s). See [CORS](#cors-hardening) below. |
 | **Encryption at rest** | Stored events are unencrypted. See [Encryption at Rest](#encryption-at-rest) below. |
 | **IP anonymization** | On by default (`anonymize_ip: true`); only disable it if you have a specific reason to keep raw IPs. See [Privacy](/guide/privacy/). |

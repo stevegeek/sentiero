@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "date"
 require_relative "base_app"
 require_relative "analytics_app"
 require_relative "monitoring_app"
@@ -57,6 +58,12 @@ module Sentiero
           else
             not_found
           end
+        when "/maintenance"
+          get_only(method) || handle_maintenance(env)
+        when "/maintenance/purge-before"
+          post_only(method) || handle_purge_before(env)
+        when "/maintenance/purge-expired"
+          post_only(method) || handle_purge_expired(env)
         when %r{\A/custom-events(?:/.*)?\z}
           Sentiero::Web::MonitoringApp.new.call(env)
         when %r{\A/issues(?:/.*)?\z}
@@ -230,6 +237,53 @@ module Sentiero
           end
           redirect("#{base_path(env)}/")
         end
+      end
+
+      def handle_maintenance(env)
+        params = query_params(env)
+        purged = params["purged"]&.then { |v| v.match?(/\A\d+\z/) ? v.to_i : nil }
+        render_page(env, Views::MaintenanceView.new(
+          retention_period: Sentiero.configuration.retention_period,
+          purged: purged,
+          error: params["error"]
+        ), request_path: "/maintenance")
+      end
+
+      def handle_purge_before(env)
+        verify_csrf(env) || begin
+          post = ::Rack::Request.new(env).POST
+          return redirect(maintenance_path(env, error: "Tick the confirmation checkbox to purge.")) unless post["confirm"] == "1"
+
+          begin
+            date = Date.iso8601(post["date"].to_s)
+          rescue ArgumentError
+            return redirect(maintenance_path(env, error: "Enter a valid date."))
+          end
+
+          # Inclusive end of the chosen day, UTC.
+          until_time = Time.utc(date.year, date.month, date.day) + 86_400 - 0.001
+          audit!(env, action: :erase_where, dataset: date.iso8601)
+          count = Sentiero.erase_where(until_time: until_time)
+          redirect(maintenance_path(env, purged: count))
+        end
+      end
+
+      def handle_purge_expired(env)
+        verify_csrf(env) || begin
+          audit!(env, action: :purge)
+          count = Sentiero.purge_expired!
+          if count.nil?
+            redirect(maintenance_path(env, error: "retention_period is not set; nothing to purge."))
+          else
+            redirect(maintenance_path(env, purged: count))
+          end
+        end
+      end
+
+      def maintenance_path(env, purged: nil, error: nil)
+        qs = ::Rack::Utils.build_query({"purged" => purged, "error" => error}.compact)
+        path = "#{base_path(env)}/maintenance"
+        qs.empty? ? path : "#{path}?#{qs}"
       end
     end
   end
