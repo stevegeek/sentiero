@@ -52,6 +52,14 @@ Sentiero.configure do |config|
   config.ingest_keys = {"demo-ingest-key" => "demo"}
   config.basic_auth = {user: DASHBOARD_USER, password: DASHBOARD_PASSWORD}
 
+  # This demo deploys behind Cloudflare, which sets CF-IPCountry (and, with the
+  # "Add visitor location headers" managed transform enabled, city/region/
+  # timezone). Trusting these headers is opt-in because they're client-spoofable
+  # when the app isn't actually behind the CDN — only enable it when Cloudflare
+  # sits in front. Geo resolves in-request; only the coarse result is stored, so
+  # anonymize_ip above is unaffected.
+  config.geo_source = :cloudflare
+
   # Server-side scrubbing runs through the built-in redaction engine on every
   # ingest: the default url_mode :strip drops URL query strings and the builtin
   # text patterns redact emails/tokens, so the demo needs no extra config.
