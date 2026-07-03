@@ -3,6 +3,7 @@
 require_relative "sentiero/version"
 require_relative "sentiero/redaction"
 require_relative "sentiero/configuration"
+require_relative "sentiero/geo"
 require_relative "sentiero/ip_anonymizer"
 require_relative "sentiero/store"
 require_relative "sentiero/erasure"

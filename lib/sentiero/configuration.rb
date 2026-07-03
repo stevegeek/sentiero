@@ -54,6 +54,10 @@ module Sentiero
     # logic), so they're declared separately from the plain attr_accessor list.
     attr_reader :session_idle_timeout, :session_max_age
 
+    # Geo headers are trivially client-spoofable when the deployment is not
+    # actually behind the CDN, so trusting them is an explicit opt-in.
+    attr_reader :geo_source
+
     ENFORCED_PRIVACY = {
       maskInputOptions: {password: true}
     }.freeze
@@ -104,6 +108,13 @@ module Sentiero
       @session_max_age = clamp_positive_seconds(value, DEFAULT_SESSION_MAX_AGE)
     end
 
+    def geo_source=(value)
+      unless value.nil? || value == :cloudflare || value.respond_to?(:call)
+        raise ArgumentError, "geo_source must be nil, :cloudflare, or a #call-able (env -> Hash)"
+      end
+      @geo_source = value
+    end
+
     private def clamp_positive_seconds(value, default)
       (value.is_a?(Numeric) && value.finite? && value > 0) ? value : default
     end
@@ -146,6 +157,7 @@ module Sentiero
       @session_max_age = DEFAULT_SESSION_MAX_AGE
       @redaction = Sentiero::Redaction::Config.new
       @anonymize_ip = true
+      @geo_source = nil
       @audit_log = nil
       # Opt-in: a share file is a full session dump leaving the operator's
       # infrastructure, so export/import routes 404 until explicitly enabled.
