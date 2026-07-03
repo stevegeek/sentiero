@@ -96,6 +96,37 @@ module Sentiero
         assert_equal ["mobile"], ids(result)
       end
 
+      # ── country ──
+
+      def test_country_filter_matches_geo_country
+        seed_session("s-de", metadata: {"geo_country" => "DE"})
+        seed_session("s-pt", metadata: {"geo_country" => "PT"})
+
+        result = Segmenter.new(@store, country: "de").matching
+
+        assert_equal ["s-de"], ids(result)
+      end
+
+      def test_country_filter_excludes_sessions_without_geo
+        seed_session("s-plain", metadata: {"plan" => "pro"})
+
+        result = Segmenter.new(@store, country: "DE").matching
+
+        assert_empty result[:sessions]
+      end
+
+      def test_matching_returns_scanned_countries_for_dropdown
+        seed_session("s-de", metadata: {"geo_country" => "DE"})
+        seed_session("s-pt", metadata: {"geo_country" => "PT"})
+        seed_session("s-plain", metadata: {"plan" => "pro"})
+
+        # countries lists every scanned country even when a filter excludes it,
+        # so the dropdown doesn't collapse to the current selection.
+        result = Segmenter.new(@store, country: "DE").matching
+
+        assert_equal %w[DE PT], result[:countries]
+      end
+
       # ── url pattern (substring, case-insensitive) ──
 
       def test_url_pattern_substring_match

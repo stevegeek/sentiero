@@ -19,6 +19,7 @@ module Sentiero
         has_errors: false,
         min_duration_ms: nil,
         max_duration_ms: nil,
+        country: nil,
         since: nil,
         until_time: nil
       )
@@ -32,6 +33,9 @@ module Sentiero
         @has_errors = has_errors
         @min_duration_ms = min_duration_ms
         @max_duration_ms = max_duration_ms
+        # Country codes compare case-insensitively (Cloudflare sends uppercase
+        # ISO-2; a custom proc may not).
+        @country = presence(country)&.upcase
         @since = since
         @until_time = until_time
       end
@@ -40,6 +44,10 @@ module Sentiero
         scan_cap = store.limits.analytics_max_scan_sessions
 
         scanned = store.list_sessions(limit: scan_cap, offset: 0, since: @since, until_time: @until_time)
+        # Collected pre-filter (and in the same scan, so the dropdown costs no
+        # extra store pass): the country dropdown must list every scanned
+        # country, not just the currently selected one.
+        countries = scanned.filter_map { |s| s[:metadata]&.[]("geo_country") }.uniq.sort
         matches = scanned.select { |summary| match?(summary) }
 
         page = matches.slice(offset, limit + 1) || []
@@ -48,7 +56,8 @@ module Sentiero
         {
           sessions: page.first(limit),
           has_next: has_next,
-          was_truncated: scanned.size >= scan_cap
+          was_truncated: scanned.size >= scan_cap,
+          countries: countries
         }
       end
 
@@ -65,6 +74,7 @@ module Sentiero
 
         browser_match?(metadata) &&
           device_match?(metadata) &&
+          country_match?(metadata) &&
           url_match?(metadata) &&
           metadata_match?(metadata) &&
           has_errors_match?(metadata) &&
@@ -81,6 +91,12 @@ module Sentiero
         return true unless @device
 
         UserAgent.device(metadata["userAgent"]) == @device
+      end
+
+      def country_match?(metadata)
+        return true unless @country
+
+        metadata["geo_country"].to_s.upcase == @country
       end
 
       def url_match?(metadata)
