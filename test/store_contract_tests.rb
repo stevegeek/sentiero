@@ -673,6 +673,26 @@ module StoreContractTests
     refute_nil @store.get_session("keep")
   end
 
+  def test_lookups_accept_binary_encoded_ids
+    # Rack delivers URL path segments as ASCII-8BIT strings; a store must
+    # match them against IDs it saved as UTF-8 (IDs are ASCII-only by
+    # validation, so the encodings are byte-identical).
+    @store.save_events(ref("s1", "w1"), make_events(2))
+
+    bin = ->(str) { str.dup.force_encoding(Encoding::ASCII_8BIT) }
+    bref = Sentiero::WindowRef.new(bin.call("s1"), bin.call("w1"))
+
+    refute_nil @store.get_session(bin.call("s1"))
+    assert_equal 2, @store.get_events(bref).size
+
+    @store.delete_window(bref)
+    assert_nil @store.get_session("s1")
+
+    @store.save_events(ref("s1", "w1"), make_events(1))
+    @store.delete_session(bin.call("s1"))
+    assert_nil @store.get_session("s1")
+  end
+
   def test_erase_where_removes_only_in_range_sessions
     @store.save_events(ref("old", "w1"), [make_event(timestamp: 1.0)])
     sleep 0.05

@@ -451,6 +451,21 @@ module ErrorStoreContractTests
     assert_raises(ArgumentError) { @store.get_server_event("bad id!") }
   end
 
+  def test_error_lookups_accept_binary_encoded_ids
+    # Rack delivers URL path segments as ASCII-8BIT strings; a store must
+    # match them against IDs it saved as UTF-8 (IDs are ASCII-only by
+    # validation, so the encodings are byte-identical).
+    bin = ->(str) { str.dup.force_encoding(Encoding::ASCII_8BIT) }
+    @store.save_occurrence(make_occurrence(fingerprint: "fp_bin", session_id: "s1"))
+
+    refute_nil @store.get_problem(bin.call("fp_bin"))
+    assert_equal 1, @store.get_occurrences(bin.call("fp_bin")).size
+    assert_equal 1, @store.occurrences_for_session(bin.call("s1")).size
+
+    @store.update_problem_status(bin.call("fp_bin"), "resolved")
+    assert_equal "resolved", @store.get_problem("fp_bin")[:status]
+  end
+
   # --- Retention: purge_older_than ages out error data ----------------------
 
   def test_purge_older_than_ages_out_error_data

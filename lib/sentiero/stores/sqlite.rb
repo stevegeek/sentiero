@@ -4,6 +4,13 @@ require "json"
 require "securerandom"
 require "monitor"
 
+# Optional dependency: load it if present, else the initializer below raises
+# a LoadError with install instructions.
+begin
+  require "sqlite3"
+rescue LoadError
+end
+
 module Sentiero
   module Stores
     class SQLite < Store
@@ -581,15 +588,35 @@ module Sentiero
         @db.execute("DELETE FROM server_events WHERE id IN (SELECT id FROM server_events ORDER BY timestamp ASC LIMIT ?)", [excess])
       end
 
+      # Rack hands URL path segments over as ASCII-8BIT strings, and sqlite3
+      # (>= 2.x) binds ASCII-8BIT params as BLOBs — so a TEXT-column lookup
+      # with a Rack-supplied ID silently matches nothing. Re-tag binary string
+      # arguments as UTF-8 on the way in (IDs are ASCII-only by validation, so
+      # the bytes are unchanged). Nested payloads (events, metadata) come from
+      # JSON.parse and are already UTF-8.
+      utf8_arg = lambda do |value|
+        case value
+        when String
+          (value.encoding == Encoding::ASCII_8BIT) ? value.dup.force_encoding(Encoding::UTF_8) : value
+        when WindowRef
+          WindowRef.new(utf8_arg.call(value.session_id), utf8_arg.call(value.window_id))
+        else
+          value
+        end
+      end
+
       # One shared SQLite3 connection can't be driven from multiple threads at once
       # (concurrent statements race on its single transaction state), and EventsApp
       # is a concurrent caller under Puma. Serialize every public op through one
       # reentrant Monitor: reentrant for internal calls (save_occurrence ->
       # save_metadata), wrap-all so new methods stay covered, defined last to see them.
+      # The same wrapper applies utf8_arg to every argument (see above).
       synchronized = public_instance_methods(false)
       prepend(Module.new do
         synchronized.each do |method_name|
           define_method(method_name) do |*args, **kwargs, &block|
+            args = args.map { |arg| utf8_arg.call(arg) }
+            kwargs = kwargs.transform_values { |value| utf8_arg.call(value) }
             @monitor.synchronize { super(*args, **kwargs, &block) }
           end
         end
