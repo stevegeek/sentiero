@@ -6,6 +6,7 @@ require_relative "body_reader"
 require_relative "../analytics/events"
 require_relative "../redaction"
 require_relative "../store"
+require_relative "../geo"
 
 module Sentiero
   module Web
@@ -82,6 +83,10 @@ module Sentiero
         if Sentiero.configuration.capture_errors && batch_has_errors?(events)
           metadata = metadata.merge("has_errors" => true)
         end
+
+        # Server-side geo enrichment (config.geo_source). Merged underneath the
+        # client's keys so a page-set metadata value is never clobbered.
+        metadata = Sentiero::Geo.resolve(env, Sentiero.configuration.geo_source).merge(metadata)
 
         unless metadata.empty?
           metadata = Sentiero::Redaction.redact_metadata(metadata, Sentiero.configuration.redaction)
