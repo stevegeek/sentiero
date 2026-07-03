@@ -27,7 +27,7 @@ Similar to [SpectatorSport](https://github.com/bensheldon/spectator_sport) by Be
 
 - **De-SaaS your session recording** — keep user interaction data in your own infrastructure instead of sending it to third-party services
 - **Privacy-respecting defaults** — all inputs masked by default, password masking enforced and cannot be disabled, per-element control via HTML attributes
-- **User-side controls** — respects Do Not Track (DNT) and Global Privacy Control (GPC), with support for explicit user opt-in/opt-out
+- **User-side controls** — honors Global Privacy Control (GPC) out of the box, with support for explicit user opt-in/opt-out
 - **Framework-agnostic** — drop into any Rack-compatible app, or use the dedicated Rails integration
 - **Complete but focused** — session recording, replay, and the tools around them, without trying to be an analytics platform
 
@@ -249,10 +249,10 @@ Sentiero ships a compliance toolkit for GDPR/CCPA-style obligations:
 - **Server-side redaction** — the `config.redaction` engine scrubs events on ingest before they reach the store: builtin patterns (emails, tokens, cards), URL query handling (`url_mode`, allow/denylists), `custom_patterns` for server-rendered PII you can pattern-match, and a `server_proc` hook (the ingest-side backstop to `data-rr-mask`/`data-rr-block`). Redaction is fail-closed: an error in `server_proc` drops the batch rather than persisting unsanitized data.
 - **IP anonymization** — `config.anonymize_ip` (default `true`) truncates client IPs before storage; set to `false` to keep raw IPs.
 - **Data retention / purge** — set `config.retention_period` (seconds) and call `Sentiero.purge_expired!` from a scheduler, or run `rake sentiero:purge` in Rails apps.
-- **Right to erasure** — `Sentiero.erase_sessions(*ids)` / `Sentiero.erase_where(**filters)`, or `rake sentiero:erase` in Rails apps.
+- **Right to erasure** — `Sentiero.erase_sessions(ids)` / `Sentiero.erase_where(**filters)`, or `rake sentiero:erase` in Rails apps.
 - **Audit hook** — `config.audit_log` receives compliance-relevant events (opt-outs, erasures, purges) for your own logging.
 
-See [the privacy guide](https://sentiero.app/guide/privacy/) for the full privacy guide including cross-tab sessions, global recording options, and compliance details.
+See [the privacy guide](https://sentiero.app/guide/privacy/) for the full privacy guide including cross-tab sessions, global recording options, and compliance details, and [Implementing Consent & Opt-Out](https://sentiero.app/guide/consent/) for step-by-step consent-banner, opt-out-toggle, and right-to-erasure recipes.
 
 ## Analytics
 
