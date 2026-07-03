@@ -46,6 +46,7 @@ module Sentiero
       assert_equal "v1", payload["context"]["release"]
       refute payload.key?("project") # project derived from key server-side
       assert_operator payload["timestamp"], :>, 0
+      assert_equal "ruby", payload["platform"]
     end
 
     def test_notify_scrubs_context
