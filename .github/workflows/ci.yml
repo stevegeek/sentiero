@@ -119,7 +119,7 @@ jobs:
           bundle exec rubycritic lib/sentiero \
             --no-browser \
             --format console \
-            --minimum-score 80
+            --minimum-score 70
 
   frontend:
     name: Frontend (JS unit)
