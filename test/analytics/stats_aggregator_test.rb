@@ -659,6 +659,26 @@ module Sentiero
         assert_equal cap + 5, uid[:count]
       end
 
+      def test_country_and_city_distributions
+        seed_session_with_metadata("s-geo1", {"geo_country" => "DE", "geo_city" => "Berlin"})
+        seed_session_with_metadata("s-geo2", {"geo_country" => "DE", "geo_city" => "Munich"})
+        seed_session_with_metadata("s-geo3", {"geo_country" => "PT", "geo_city" => "Lisbon"})
+
+        stats = StatsAggregator.new(@store).aggregate
+
+        assert_equal({"DE" => 2, "PT" => 1}, stats[:country_distribution])
+        assert_equal 1, stats[:city_distribution]["Berlin"]
+      end
+
+      def test_geo_keys_are_not_custom_metadata
+        seed_session_with_metadata("s-geo1", {"geo_country" => "DE", "plan" => "pro"})
+
+        keys = StatsAggregator.new(@store).aggregate[:metadata_distributions].map { |d| d[:key] }
+
+        refute_includes keys, "geo_country"
+        assert_includes keys, "plan"
+      end
+
       # ── C6(b): bounded server-exception overlay ──
 
       def seed_occurrence(fingerprint, timestamp)
