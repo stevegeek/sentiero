@@ -57,7 +57,7 @@ This is exactly what the Ruby `ScriptTag.render` helper emits — two tags, noth
 | `captureMetadata` | boolean | `false` | Send page metadata (URL, referrer, viewport) with batches. |
 | `trackCustomEvents` | boolean | `false` | Track events declared via `data-sentiero-track-*` element attributes. |
 | `optOutCookieName` | string | unset | Cookie name checked for user opt-out. |
-| `respectGpc` | boolean | `false` | Don't record visitors sending the Global Privacy Control signal. |
+| `respectGpc` | boolean | `false` | Don't even start recording for visitors sending the Global Privacy Control signal. Note the server honors GPC by default regardless (`config.respect_gpc`), dropping their batches at ingest — this key just avoids the wasted requests. |
 
 The booleans mirror the Ruby `Sentiero.configure` flags (`capture_clicks`, `track_navigation`, …) — the Ruby helper just serializes them into this same JSON block.
 

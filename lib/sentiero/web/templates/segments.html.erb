@@ -24,6 +24,15 @@
           </select>
         </div>
         <div class="shrink-0">
+          <label for="country" class="label">Country</label>
+          <select name="country" id="country" class="select" style="width:8rem">
+            <option value="">Any</option>
+            <% (view.country_options | [view.filters[:country]].compact).each do |c| -%>
+              <option value="<%= view.h(c) %>" <%= view.filters[:country] == c ? "selected" : "" %>><%= view.h(c) %></option>
+            <% end -%>
+          </select>
+        </div>
+        <div class="shrink-0">
           <label for="url_pattern" class="label">URL pattern</label>
           <input type="text" name="url_pattern" id="url_pattern" class="input" style="width:12rem" value="<%= view.h(view.filters[:url_pattern].to_s) %>" placeholder="substring or *glob*">
         </div>

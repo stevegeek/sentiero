@@ -1,0 +1,16 @@
+<h1 class="text-3xl font-bold text-gray-900 mb-2">💥 Server error (that's the point)</h1>
+<p class="text-sm text-gray-500 mb-8">
+  The server raised <code class="bg-gray-100 px-1 py-0.5 rounded text-xs"><%= h(@error.class.name) %></code>
+  and reported it to Sentiero before rendering this page.
+</p>
+
+<div class="p-4 bg-orange-50 rounded-lg text-sm text-orange-900 leading-relaxed mb-8">
+  <strong class="block mb-1">See it in the dashboard</strong>
+  The exception was sent to this demo's own ingest endpoint by
+  <code class="bg-orange-100 px-1 py-0.5 rounded text-xs">Sentiero::Reporter</code>.
+  Open <a href="/sentiero/dashboard/issues" class="underline font-semibold">Issues</a>
+  in the dashboard (demo / demo) &mdash; repeated triggers group into one problem
+  with an occurrence count, linked to your replay session.
+</div>
+
+<a href="/" class="text-blue-600 hover:underline text-sm">&larr; Back to the app</a>

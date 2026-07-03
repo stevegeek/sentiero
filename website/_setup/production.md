@@ -20,6 +20,7 @@ A pre-deployment checklist. Each row links to the page that owns the detail.
 | **CORS** | Set `cors_origins` to your frontend's actual origin(s). See [CORS](#cors-hardening) below. |
 | **Encryption at rest** | Stored events are unencrypted. See [Encryption at Rest](#encryption-at-rest) below. |
 | **IP anonymization** | On by default (`anonymize_ip: true`); only disable it if you have a specific reason to keep raw IPs. See [Privacy](/guide/privacy/). |
+| **Visitor geolocation** | Optional. Behind Cloudflare or other CDNs, set `config.geo_source` to add country/city to analytics with no IP storage. See [Visitor Geolocation](/guide/geolocation/). |
 | **Rate limiting** | Add `Rack::Attack` or nginx `limit_req` on the events endpoint. Sentiero enforces payload size limits, not rate limits. |
 
 ## Authentication

@@ -31,6 +31,8 @@ module Sentiero
             event_type_breakdown: event_type_breakdown(acc.event_types),
             browser_distribution: sort_by_count(acc.browsers),
             device_distribution: sort_by_count(acc.devices),
+            country_distribution: sort_by_count(acc.countries),
+            city_distribution: sort_by_count(acc.cities),
             top_entry_pages: top_entry_pages(acc),
             top_referrers: top_list(acc.referrers, :referrer, StatsAggregator::TOP_LIST_LIMIT),
             session_duration_buckets: acc.duration_buckets,

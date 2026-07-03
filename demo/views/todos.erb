@@ -4,10 +4,16 @@
 <h1 class="text-3xl font-bold text-gray-900 mb-2"<%= @user_name ? " data-rr-mask" : "" %>>
   <% if @user_name %>Welcome, <%= h(@user_name) %>!<% else %>Todo List<% end %>
 </h1>
-<p class="text-sm text-gray-500 mb-8">
-  Sentiero demo &mdash; your session is being recorded.
-  <a href="/sentiero/dashboard/" class="text-blue-600 hover:underline">View dashboard</a> (demo / demo)
-</p>
+<div class="mb-8 p-4 bg-blue-50 rounded-lg text-sm text-blue-900 leading-relaxed">
+  <strong class="block mb-1">👋 You're looking at the Sentiero demo</strong>
+  Trailhead is a toy todo app instrumented with
+  <a href="https://github.com/stevegeek/sentiero" class="underline">Sentiero</a> session recording.
+  Once you accept the consent banner, everything you do here is recorded: add some
+  todos, trigger the errors below, wander through the
+  <a href="/landing" class="underline">landing page</a> and
+  <a href="/signup" class="underline">signup flow</a> &mdash; then watch it all back in the
+  <a href="/sentiero/dashboard/" class="underline font-semibold">dashboard</a> (login: demo / demo).
+</div>
 
 <!-- Adding a todo fires the `todo_created` custom event (funnel step 4)
      via the declarative data-sentiero-track-submit attribute. -->
@@ -26,13 +32,24 @@
   >Add</button>
 </form>
 
-<!-- e2e: button that throws an uncaught error to exercise error capture -->
-<button
-  type="button"
-  id="trigger-error-btn"
-  onclick="throw new Error('Sentiero e2e demo error');"
-  class="mb-8 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
->Trigger JS error (demo)</button>
+<!-- e2e: buttons that raise a client-side and a server-side error, feeding
+     both error-tracking lanes (browser error capture + Reporter -> Issues). -->
+<div class="flex flex-wrap gap-2 mb-8">
+  <button
+    type="button"
+    id="trigger-error-btn"
+    onclick="throw new Error('Sentiero e2e demo error');"
+    class="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors"
+  >Trigger JS error (demo)</button>
+  <form action="/boom" method="post" class="inline">
+    <%= csrf_tag("/boom") %>
+    <button
+      type="submit"
+      id="trigger-server-error-btn"
+      class="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
+    >Trigger server error (demo)</button>
+  </form>
+</div>
 
 <% if @todos.empty? %>
   <div class="text-center py-12 text-gray-400 text-base">No todos yet. Add one above!</div>
@@ -141,8 +158,15 @@
 
     function render() {
       var out = optedOut();
+      var consented = document.cookie.indexOf("sentiero_demo_consent=granted") !== -1;
       btn.textContent = out ? "Opt back in (resume recording)" : "Opt out of recording";
-      status.textContent = out ? "🔴 Opted out — not being recorded." : "🟢 Currently being recorded.";
+      if (out) {
+        status.textContent = "🔴 Opted out — not being recorded.";
+      } else if (!consented) {
+        status.textContent = "⚪ Not recording — recording consent hasn't been given.";
+      } else {
+        status.textContent = "🟢 Currently being recorded.";
+      }
     }
 
     btn.addEventListener("click", function () {

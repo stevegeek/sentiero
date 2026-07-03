@@ -26,7 +26,7 @@ const DASHBOARD = "/sentiero/dashboard/";
 const HEATMAP = "/sentiero/dashboard/analytics/heatmap";
 
 async function recordSessionWithClicks(page: Page) {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/landing", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveTitle(/Trailhead/);
 
   await page.getByRole("button", { name: "Watch the demo" }).click();
