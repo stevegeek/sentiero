@@ -1,0 +1,50 @@
+<h1 class="page-title">Maintenance</h1>
+
+<% if view.purged %>
+  <div class="card mb-4 px-4 py-3 text-sm">Purged <%= view.purged %> session<%= view.purged == 1 ? "" : "s" %>.</div>
+<% end %>
+<% if view.error %>
+  <div class="card mb-4 px-4 py-3 text-sm text-red-600"><%= view.h(view.error) %></div>
+<% end %>
+
+<div class="card mb-4 px-4 py-3">
+  <h2 class="text-sm font-semibold mb-2">Purge recordings before a date</h2>
+  <p class="text-xs text-gray-500 mb-3">
+    Permanently deletes every session (and its error occurrences and tracked
+    events) last updated on or before the chosen date, UTC. This cannot be undone.
+  </p>
+  <form method="post" action="<%= view.h(view.base_path) %>/maintenance/purge-before">
+    <input type="hidden" name="csrf_token" value="<%= view.h(view.csrf_token) %>">
+    <div class="flex items-end gap-3">
+      <div>
+        <label for="date" class="label">Delete on/before</label>
+        <input type="date" name="date" id="date" class="input" required>
+      </div>
+      <label class="text-xs flex items-center gap-1.5 pb-1.5">
+        <input type="checkbox" name="confirm" value="1">
+        I understand this permanently deletes recordings
+      </label>
+      <button type="submit" class="btn btn-danger">Purge</button>
+    </div>
+  </form>
+</div>
+
+<div class="card mb-4 px-4 py-3">
+  <h2 class="text-sm font-semibold mb-2">Retention</h2>
+  <% if view.retention_period %>
+    <p class="text-xs text-gray-500 mb-3">
+      <code>retention_period</code> is <%= view.retention_period %> seconds
+      (<%= view.retention_days %> days). Scheduled purges should run from cron;
+      this button runs one now.
+    </p>
+    <form method="post" action="<%= view.h(view.base_path) %>/maintenance/purge-expired">
+      <input type="hidden" name="csrf_token" value="<%= view.h(view.csrf_token) %>">
+      <button type="submit" class="btn btn-danger">Run retention purge now</button>
+    </form>
+  <% else %>
+    <p class="text-xs text-gray-500">
+      <code>retention_period</code> is not set — recordings are kept forever.
+      See <a class="underline" href="https://www.sentiero.app/guide/privacy/#data-retention--purge">data retention</a>.
+    </p>
+  <% end %>
+</div>
