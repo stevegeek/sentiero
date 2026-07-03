@@ -43,6 +43,24 @@ class FingerprintConfigTest < Minitest::Test
     assert_same custom, @config.resolve(nil)
   end
 
+  def test_default_platform_as_symbol_resolves_to_registered_normalizer
+    # default_platform is stored unchanged; resolve must coerce it with
+    # .to_s to match the string keys register() stores, the same way tiers
+    # 2/3 coerce the incoming `platform` argument.
+    @config.default_platform = :crystal
+
+    assert_same Sentiero::Fingerprint::CRYSTAL_NORMALIZER, @config.resolve(nil)
+  end
+
+  def test_default_platform_set_to_unregistered_name_falls_back_to_ruby_normalizer
+    # Documented fallback: an operator can misconfigure default_platform to a
+    # name that was never registered; absent/blank platform resolution must
+    # not raise and must fall back to RUBY_NORMALIZER.
+    @config.default_platform = "cobol"
+
+    assert_same Sentiero::Fingerprint::RUBY_NORMALIZER, @config.resolve(nil)
+  end
+
   def test_register_overrides_a_builtin
     custom = ->(frame) { frame.upcase }
     @config.register("ruby", custom)
