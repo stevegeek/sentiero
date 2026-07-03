@@ -195,7 +195,6 @@
       <div class="hidden md:flex items-center gap-8 text-sm font-medium text-night-600">
         <a href="#features" class="hover:text-coral-600 transition-colors">Features</a>
         <a href="#privacy" class="hover:text-coral-600 transition-colors">Privacy</a>
-        <a href="#quickstart" class="hover:text-coral-600 transition-colors">Quick Start</a>
         <a href="/guide/introduction/" class="hover:text-coral-600 transition-colors">Documentation</a>
         <a href="#analytics" class="hover:text-coral-600 transition-colors">Analytics</a>
       </div>
@@ -204,7 +203,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           GitHub
         </a>
-        <a href="#quickstart" class="btn-coral text-sm !py-2.5 !px-5">Get Started</a>
+        <a href="/guide/introduction/" class="btn-coral text-sm !py-2.5 !px-5">Get Started</a>
       </div>
     </div>
   </nav>
@@ -224,9 +223,9 @@
           Sentiero is an open-source session recording gem for Ruby. Drop it into any Rack app (Rails, Sinatra, Hanami, Roda) and understand your users without compromising their privacy.
         </p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 fade-up fade-up-d3">
-          <a href="#quickstart" class="btn-coral">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-            Install the Gem
+          <a href="/guide/introduction/" class="btn-coral">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11a2 2 0 012 2v14a1 1 0 01-1.4.9L14 20H6a2 2 0 01-2-2V4z"/><path d="M9 8h5M9 12h5"/></svg>
+            View Documentation
           </a>
           <a href="#features" class="btn-outline">See Features &rarr;</a>
         </div>
@@ -501,69 +500,6 @@
     </div>
   </section>
 
-  <!-- QUICK START -->
-  <section id="quickstart" class="py-24 md:py-32 bg-white">
-    <div class="max-w-6xl mx-auto px-6">
-      <div class="text-center max-w-2xl mx-auto mb-14 reveal">
-        <span class="badge">Quick Start</span>
-        <h2 class="font-display font-bold text-3xl md:text-4xl mt-4 tracking-tight">Up and running in under a minute</h2>
-      </div>
-
-      <div class="max-w-2xl mx-auto space-y-6 reveal">
-        <!-- Step 1 -->
-        <div>
-          <div class="flex items-center gap-3 mb-3">
-            <span class="w-7 h-7 rounded-full bg-coral-500 text-white text-xs font-bold flex items-center justify-center">1</span>
-            <span class="font-display font-semibold text-sm">Add to your Gemfile</span>
-          </div>
-          <div class="code-block p-5 overflow-x-auto">
-            <span class="cmt"># Gemfile</span><br/>
-            <span class="kw">gem</span> <span class="str">"sentiero-rails"</span>
-          </div>
-        </div>
-        <!-- Step 2 -->
-        <div>
-          <div class="flex items-center gap-3 mb-3">
-            <span class="w-7 h-7 rounded-full bg-coral-500 text-white text-xs font-bold flex items-center justify-center">2</span>
-            <span class="font-display font-semibold text-sm">Run the install generator</span>
-          </div>
-          <div class="code-block p-5 overflow-x-auto">
-            <span class="kw">$</span> bundle install<br/>
-            <span class="kw">$</span> rails generate sentiero:install<br/>
-            <span class="kw">$</span> rails db:migrate
-          </div>
-        </div>
-        <!-- Step 3 -->
-        <div>
-          <div class="flex items-center gap-3 mb-3">
-            <span class="w-7 h-7 rounded-full bg-coral-500 text-white text-xs font-bold flex items-center justify-center">3</span>
-            <span class="font-display font-semibold text-sm">Mount the routes</span>
-          </div>
-          <div class="code-block p-5 overflow-x-auto">
-            <span class="cmt"># config/routes.rb</span><br/>
-            <span class="kw">mount</span> <span class="sym">Sentiero::Web::EventsApp</span>.<span class="fn">new</span> =&gt; <span class="str">"/sentiero/events"</span><br/>
-            <span class="kw">mount</span> <span class="sym">Sentiero::Web::DashboardApp</span>.<span class="fn">new</span> =&gt; <span class="str">"/sentiero"</span>
-          </div>
-        </div>
-        <!-- Step 4 -->
-        <div>
-          <div class="flex items-center gap-3 mb-3">
-            <span class="w-7 h-7 rounded-full bg-coral-500 text-white text-xs font-bold flex items-center justify-center">4</span>
-            <span class="font-display font-semibold text-sm">Add the recorder to your layout</span>
-          </div>
-          <div class="code-block p-5 overflow-x-auto">
-            <span class="cmt">&lt;%# app/views/layouts/application.html.erb %&gt;</span><br/>
-            <span class="kw">&lt;%=</span> <span class="fn">sentiero_script_tag</span> <span class="kw">%&gt;</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="text-center mt-10 reveal">
-        <p class="text-night-400 text-sm">Using Roda, Sinatra, or plain Rack? The core <code class="text-coral-600 bg-coral-50 px-1.5 py-0.5 rounded text-xs font-mono">sentiero</code> gem works with any Rack-compatible framework. See the docs for framework-specific setup.</p>
-      </div>
-    </div>
-  </section>
-
   <!-- OPEN SOURCE PROMISE -->
   <section class="py-24 md:py-32 bg-night-50">
     <div class="max-w-6xl mx-auto px-6">
@@ -663,7 +599,7 @@
         Add Sentiero to your Gemfile, mount the routes, and you're recording sessions in under a minute. Free, open source, privacy-first.
       </p>
       <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10">
-        <a href="#quickstart" class="btn-coral">
+        <a href="/guide/introduction/" class="btn-coral">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           Get Started
         </a>
