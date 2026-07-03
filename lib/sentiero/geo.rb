@@ -1,18 +1,16 @@
 # frozen_string_literal: true
 
 module Sentiero
-  # Resolves coarse visitor geolocation from a Rack env at ingest.
-  # Deliberately coarse — country/city/region/timezone, no coordinates, no
-  # IP: resolution happens in-request and only the result is stored, so
+  # Deliberately coarse — country/city/region/timezone, no coordinates, no IP:
+  # resolution happens in-request and only the result is stored, so
   # config.anonymize_ip is unaffected.
   module Geo
     MAX_VALUE_LENGTH = 256
     PROC_WARNING_LOCK = Mutex.new
     @proc_warning_emitted = false
 
-    # CF-IPCountry ships with Cloudflare IP geolocation enabled; the other
-    # headers require the "Add visitor location headers" managed transform,
-    # so country-only capture is the common case.
+    # CF-IPCountry ships with Cloudflare IP geolocation; the other headers need
+    # the "Add visitor location headers" managed transform, so country-only is the common case.
     CLOUDFLARE_HEADERS = {
       "geo_country" => "HTTP_CF_IPCOUNTRY",
       "geo_city" => "HTTP_CF_IPCITY",

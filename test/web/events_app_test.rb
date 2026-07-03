@@ -673,7 +673,6 @@ module Sentiero
       end
 
       def test_geo_enrichment_works_without_client_metadata
-        # captureMetadata off client-side must not prevent geo capture.
         Sentiero.configuration.geo_source = :cloudflare
 
         post "/", JSON.generate(valid_payload),

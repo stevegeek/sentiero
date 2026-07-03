@@ -54,8 +54,8 @@ module Sentiero
     # logic), so they're declared separately from the plain attr_accessor list.
     attr_reader :session_idle_timeout, :session_max_age
 
-    # Geo headers are trivially client-spoofable when the deployment is not
-    # actually behind the CDN, so trusting them is an explicit opt-in.
+    # Geo headers are trivially spoofable unless actually behind the CDN, so
+    # trusting them is an explicit opt-in.
     attr_reader :geo_source
 
     ENFORCED_PRIVACY = {

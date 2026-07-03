@@ -120,8 +120,6 @@ module Sentiero
         seed_session("s-pt", metadata: {"geo_country" => "PT"})
         seed_session("s-plain", metadata: {"plan" => "pro"})
 
-        # countries lists every scanned country even when a filter excludes it,
-        # so the dropdown doesn't collapse to the current selection.
         result = Segmenter.new(@store, country: "DE").matching
 
         assert_equal %w[DE PT], result[:countries]

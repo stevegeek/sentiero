@@ -50,8 +50,7 @@ module Sentiero
             ["Browsers", stats[:browser_distribution], "No browser data."],
             ["Devices", stats[:device_distribution], "No device data."]
           ]
-          # Location cards only render when geo capture is on and resolving,
-          # so feature-off deployments don't see two permanently empty cards.
+          # Omitted when empty, so feature-off deployments don't see two permanently empty cards.
           {"Countries" => :country_distribution, "Cities" => :city_distribution}.each do |label, key|
             dist = stats[key] || {}
             base << [label, dist, ""] unless dist.empty?

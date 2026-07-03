@@ -5,7 +5,7 @@ require_relative "../user_agent"
 
 module Sentiero
   module Analytics
-    # Filters sessions on read by browser/device/URL/metadata/has-errors/duration
+    # Filters sessions on read by browser/device/country/URL/metadata/has-errors/duration
     # (AND-combined), scanning up to the store's limits.analytics_max_scan_sessions.
     class Segmenter < Analyzer
       def initialize(
@@ -33,8 +33,7 @@ module Sentiero
         @has_errors = has_errors
         @min_duration_ms = min_duration_ms
         @max_duration_ms = max_duration_ms
-        # Country codes compare case-insensitively (Cloudflare sends uppercase
-        # ISO-2; a custom proc may not).
+        # Normalized: Cloudflare sends uppercase ISO-2, but a custom proc may not.
         @country = presence(country)&.upcase
         @since = since
         @until_time = until_time
@@ -44,9 +43,8 @@ module Sentiero
         scan_cap = store.limits.analytics_max_scan_sessions
 
         scanned = store.list_sessions(limit: scan_cap, offset: 0, since: @since, until_time: @until_time)
-        # Collected pre-filter (and in the same scan, so the dropdown costs no
-        # extra store pass): the country dropdown must list every scanned
-        # country, not just the currently selected one.
+        # Collected pre-filter, in the same scan (no extra store pass): the
+        # dropdown must list every scanned country, not just the current selection.
         countries = scanned.filter_map { |s| s[:metadata]&.[]("geo_country") }.uniq.sort
         matches = scanned.select { |summary| match?(summary) }
 

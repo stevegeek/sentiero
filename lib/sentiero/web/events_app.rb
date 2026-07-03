@@ -84,8 +84,7 @@ module Sentiero
           metadata = metadata.merge("has_errors" => true)
         end
 
-        # Server-side geo enrichment (config.geo_source). Merged underneath the
-        # client's keys so a page-set metadata value is never clobbered.
+        # Merged underneath the client's keys so a page-set metadata value is never clobbered.
         metadata = Sentiero::Geo.resolve(env, Sentiero.configuration.geo_source).merge(metadata)
 
         unless metadata.empty?

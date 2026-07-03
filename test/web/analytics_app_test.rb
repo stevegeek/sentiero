@@ -767,7 +767,6 @@ module Sentiero
       def test_segments_country_param_rejects_non_iso_codes
         save_session_with_metadata("s-de", {"geo_country" => "DE"})
 
-        # Garbage country input is dropped (filter off), not errored.
         get "/analytics/segments", {"country" => "<script>"}
 
         assert_equal 200, last_response.status
