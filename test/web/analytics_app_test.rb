@@ -753,6 +753,27 @@ module Sentiero
         assert_includes last_response.body, "until=#{today}"
       end
 
+      def test_segments_filters_by_country
+        save_session_with_metadata("s-de", {"geo_country" => "DE"})
+        save_session_with_metadata("s-pt", {"geo_country" => "PT"})
+
+        get "/analytics/segments", {"country" => "DE"}
+
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, "s-de"
+        refute_includes last_response.body, "s-pt"
+      end
+
+      def test_segments_country_param_rejects_non_iso_codes
+        save_session_with_metadata("s-de", {"geo_country" => "DE"})
+
+        # Garbage country input is dropped (filter off), not errored.
+        get "/analytics/segments", {"country" => "<script>"}
+
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, "s-de"
+      end
+
       # ── errors ──
 
       def seed_error_session(id, window_id, payload, at: now_ms)
