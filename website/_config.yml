@@ -1,6 +1,6 @@
 title: Sentiero
 description: Self-hosted, privacy-first browser session recording, replay, and product analytics for Ruby.
-url: "https://sentiero.app"
+url: "https://www.sentiero.app"
 baseurl: ""
 lang: en-US
 timezone: UTC
@@ -76,6 +76,5 @@ exclude:
   - node_modules
   - Gemfile
   - Gemfile.lock
-  - DEPLOY.md
   - template
   - template_original

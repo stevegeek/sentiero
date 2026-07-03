@@ -12,9 +12,9 @@
   <nav class="bg-white border-b border-gray-200 sticky top-0 z-10">
     <div class="max-w-5xl mx-auto px-4 h-14 flex items-center gap-5">
       <a href="/" class="font-bold text-gray-900 mr-2">⛰️ Trailhead</a>
-      <a href="/" class="text-sm text-gray-600 hover:text-gray-900">Landing</a>
+      <a href="/" class="text-sm text-gray-600 hover:text-gray-900">App</a>
+      <a href="/landing" class="text-sm text-gray-600 hover:text-gray-900">Landing</a>
       <a href="/signup" class="text-sm text-gray-600 hover:text-gray-900">Sign up</a>
-      <a href="/app" class="text-sm text-gray-600 hover:text-gray-900">App</a>
       <a href="https://example.com" class="text-sm text-gray-600 hover:text-gray-900">Guides ↗</a>
       <span class="flex-1"></span>
       <a href="/sentiero/dashboard/" class="text-sm text-blue-600 hover:underline">Dashboard</a>
@@ -29,6 +29,50 @@
     </div>
   <% end %>
 
-  <%= sentiero_script_tag(events_url: "/sentiero/events") %>
+  <%# Consent-first recording, per https://www.sentiero.app/guide/consent/:
+      the script tag is rendered only after the visitor accepts, so nothing is
+      captured (and no recorder cookies are set) before consent. %>
+  <% if request.cookies["sentiero_demo_consent"] == "granted" %>
+    <%= sentiero_script_tag(events_url: "/sentiero/events") %>
+  <% end %>
+
+  <% unless request.cookies.key?("sentiero_demo_consent") %>
+    <div id="consent-banner" class="fixed bottom-0 inset-x-0 z-20 bg-gray-900 text-white shadow-lg">
+      <div class="max-w-5xl mx-auto px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <p class="flex-1 text-sm text-gray-200">
+          This demo uses <strong>Sentiero</strong> to record your session so you can
+          replay it in the dashboard. Recording (and its cookies) starts only if you accept.
+        </p>
+        <div class="flex gap-2">
+          <button
+            type="button"
+            id="consent-accept"
+            class="px-4 py-2 bg-emerald-500 text-white text-sm font-semibold rounded-lg hover:bg-emerald-400 transition-colors"
+          >Accept &amp; record</button>
+          <button
+            type="button"
+            id="consent-decline"
+            class="px-4 py-2 bg-gray-700 text-white text-sm font-semibold rounded-lg hover:bg-gray-600 transition-colors"
+          >Decline</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Accepting reloads so the server renders the (freshly gated) script
+      // tag; script tags injected into a loaded page don't execute.
+      (function () {
+        function decide(value) {
+          document.cookie = "sentiero_demo_consent=" + value +
+            "; path=/; max-age=31536000; SameSite=Lax";
+          document.getElementById("consent-banner").remove();
+          if (value === "granted") location.reload();
+        }
+        document.getElementById("consent-accept")
+          .addEventListener("click", function () { decide("granted"); });
+        document.getElementById("consent-decline")
+          .addEventListener("click", function () { decide("denied"); });
+      })();
+    </script>
+  <% end %>
 </body>
 </html>

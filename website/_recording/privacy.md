@@ -146,11 +146,13 @@ function onConsentAccepted() {
 
 **Opt-out is not a substitute for consent gating.** `window.Sentiero.optOut()` is a post-hoc signal: the recorder has already started before the user can call it, which means the initial DOM snapshot and any early events have already been captured. For consent-first compliance, gate the tag at render time.
 
+A complete banner-plus-gating recipe, including the CMP-callback variant, is in [Implementing Consent & Opt-Out](/guide/consent/).
+
 ## Right to Erasure (GDPR Art. 17)
 
 When a data subject exercises their right to erasure, you can delete their recordings programmatically, beyond the per-session delete button in the dashboard.
 
-Every recording is keyed by session ID, so erasure works at the session level. Map a user to their session IDs using whatever metadata you record (for example via `window.Sentiero.setMetadata({ userId: "..." })` or your own correlation mechanism), then erase those sessions.
+Every recording is keyed by session ID, so erasure works at the session level. Map a user to their session IDs using whatever metadata you record (for example via `window.Sentiero.setMetadata({ userId: "..." })` or your own correlation mechanism), then erase those sessions. A step-by-step "delete my data" recipe is in [Implementing Consent & Opt-Out](/guide/consent/#recipe-delete-my-data-right-to-erasure).
 
 ```ruby
 # Erase specific sessions (returns the number actually deleted).
@@ -200,7 +202,7 @@ These options support GDPR/CCPA-style obligations. All are off (or no-op) by def
 
 ### End-user opt-out
 
-Let a visitor turn recording off for themselves. Enable the feature and, optionally, name the cookie:
+Let a visitor turn recording off for themselves (a ready-made toggle recipe is in [Implementing Consent & Opt-Out](/guide/consent/#recipe-end-user-opt-out-toggle)). Enable the feature and, optionally, name the cookie:
 
 ```ruby
 Sentiero.configure do |config|

@@ -15,6 +15,9 @@ class ErrorTrackingDashboardTest < Minitest::Test
       c.store = Sentiero::Rails::Store.new
       c.ingest_keys = {"k1" => "app"}
       c.auth_callback = nil
+      # The dashboard fails closed (403) without auth; these tests exercise
+      # error tracking, not auth, so opt into the unauthenticated dashboard.
+      c.allow_insecure_dashboard = true
     end
     Sentiero::Rails::Problem.delete_all
     Sentiero::Rails::Occurrence.delete_all

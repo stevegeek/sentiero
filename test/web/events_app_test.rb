@@ -649,6 +649,55 @@ module Sentiero
         assert_equal 1, Sentiero.store.get_events(Sentiero::WindowRef.new("sess-1", "win-1")).size
       end
 
+      # --- geo enrichment (config.geo_source gated, server-side) ---
+
+      def test_geo_source_cloudflare_enriches_session_metadata
+        Sentiero.configuration.geo_source = :cloudflare
+
+        post "/", JSON.generate(valid_payload),
+          {"CONTENT_TYPE" => "application/json", "HTTP_CF_IPCOUNTRY" => "DE", "HTTP_CF_IPCITY" => "Berlin"}
+
+        assert_equal 200, last_response.status
+        metadata = Sentiero.store.get_session("sess-1")[:metadata]
+        assert_equal "DE", metadata["geo_country"]
+        assert_equal "Berlin", metadata["geo_city"]
+      end
+
+      def test_geo_disabled_by_default_stores_no_geo_keys
+        post "/", JSON.generate(valid_payload.merge("metadata" => {"plan" => "pro"})),
+          {"CONTENT_TYPE" => "application/json", "HTTP_CF_IPCOUNTRY" => "DE"}
+
+        assert_equal 200, last_response.status
+        metadata = Sentiero.store.get_session("sess-1")[:metadata]
+        refute metadata.key?("geo_country")
+      end
+
+      def test_geo_enrichment_works_without_client_metadata
+        Sentiero.configuration.geo_source = :cloudflare
+
+        post "/", JSON.generate(valid_payload),
+          {"CONTENT_TYPE" => "application/json", "HTTP_CF_IPCOUNTRY" => "PT"}
+
+        assert_equal "PT", Sentiero.store.get_session("sess-1")[:metadata]["geo_country"]
+      end
+
+      def test_client_metadata_wins_over_server_geo_on_conflict
+        Sentiero.configuration.geo_source = :cloudflare
+
+        post "/", JSON.generate(valid_payload.merge("metadata" => {"geo_country" => "custom"})),
+          {"CONTENT_TYPE" => "application/json", "HTTP_CF_IPCOUNTRY" => "DE"}
+
+        assert_equal "custom", Sentiero.store.get_session("sess-1")[:metadata]["geo_country"]
+      end
+
+      def test_raising_geo_source_does_not_break_ingest
+        Sentiero.configuration.geo_source = ->(_env) { raise "geoip db missing" }
+
+        capture_io { post "/", JSON.generate(valid_payload), {"CONTENT_TYPE" => "application/json"} }
+
+        assert_equal 200, last_response.status
+      end
+
       # --- redaction engine (Sentiero::Redaction applied on every ingest) ---
 
       def test_redacts_navigation_url_by_default

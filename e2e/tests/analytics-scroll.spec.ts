@@ -19,7 +19,7 @@ const SCROLL = "/sentiero/dashboard/analytics/scroll";
 async function recordScrolledSession(page: Page) {
   // The landing page is deliberately long/scrollable (see demo/views/landing.erb),
   // so it exercises this feature more naturally than the todo app.
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/landing", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveTitle(/Trailhead/);
 
   // Make the page tall enough to scroll, then scroll down so rrweb records

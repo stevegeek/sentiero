@@ -102,6 +102,7 @@ module Sentiero
           filters: filters,
           browser_options: BROWSER_OPTIONS,
           device_options: DEVICE_OPTIONS,
+          country_options: result[:countries],
           sessions: result[:sessions],
           page: page,
           per_page: per_page,
@@ -322,6 +323,7 @@ module Sentiero
         {
           browser: allowed(params["browser"], BROWSER_OPTIONS),
           device: allowed(params["device"], DEVICE_OPTIONS),
+          country: clean_country(params["country"]),
           url_pattern: clean_text(params["url_pattern"]),
           metadata_key: clean_text(params["metadata_key"]),
           metadata_value: clean_text(params["metadata_value"]),
@@ -342,6 +344,7 @@ module Sentiero
         query = {
           "browser" => filters[:browser],
           "device" => filters[:device],
+          "country" => filters[:country],
           "url_pattern" => filters[:url_pattern],
           "metadata_key" => filters[:metadata_key],
           "metadata_value" => filters[:metadata_value],
@@ -364,6 +367,13 @@ module Sentiero
         stripped = value.strip
         return nil if stripped.empty?
         stripped[0, MAX_FILTER_LENGTH]
+      end
+
+      # Two-letter ISO code only (what Cloudflare sends); anything else is
+      # dropped rather than echoed back into the form.
+      def clean_country(value)
+        text = clean_text(value)
+        text&.match?(/\A[A-Za-z]{2}\z/) ? text.upcase : nil
       end
 
       # The form takes durations in whole seconds; the Segmenter works in ms.

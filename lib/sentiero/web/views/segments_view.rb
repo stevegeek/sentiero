@@ -6,11 +6,12 @@ module Sentiero
   module Web
     module Views
       class SegmentsView < BaseView
-        def initialize(filters:, browser_options:, device_options:, sessions:, page:, per_page:, has_next:, was_truncated:, filter_query:)
+        def initialize(filters:, browser_options:, device_options:, country_options:, sessions:, page:, per_page:, has_next:, was_truncated:, filter_query:)
           super()
           @filters = filters
           @browser_options = browser_options
           @device_options = device_options
+          @country_options = country_options
           @sessions = sessions
           @page = page
           @per_page = per_page
@@ -19,7 +20,7 @@ module Sentiero
           @filter_query = filter_query
         end
 
-        attr_reader :filters, :browser_options, :device_options, :sessions, :page, :per_page, :has_next, :was_truncated, :filter_query
+        attr_reader :filters, :browser_options, :device_options, :country_options, :sessions, :page, :per_page, :has_next, :was_truncated, :filter_query
 
         def template = "segments.html.erb"
       end

@@ -14,6 +14,9 @@ class SessionRecordingTest < Minitest::Test
       c.flush_interval_ms = 500
       c.flush_event_threshold = 2
       c.auth_callback = nil
+      # The dashboard fails closed (403) without auth; these tests exercise
+      # recording, not auth, so opt into the unauthenticated dashboard.
+      c.allow_insecure_dashboard = true
     end
     Sentiero::Rails::Session.delete_all
     Sentiero::Rails::Event.delete_all

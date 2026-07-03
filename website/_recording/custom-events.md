@@ -1,6 +1,6 @@
 ---
 title: Custom Events
-nav_order: 3
+nav_order: 4
 description: Track custom interactions via the JS API or data-sentiero-track-* attributes.
 ---
 

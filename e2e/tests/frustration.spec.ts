@@ -16,7 +16,7 @@ import { test, expect, flushRecorder } from "./fixtures";
 const DASHBOARD = "/sentiero/dashboard/";
 
 test("shows frustration annotations in the replay sidebar", async ({ page }) => {
-  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.goto("/landing", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveTitle(/Trailhead/);
 
   // Rage-click the inert "Watch the demo" button so rrweb records >3 mouse

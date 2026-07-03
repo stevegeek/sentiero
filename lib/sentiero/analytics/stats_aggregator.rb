@@ -18,7 +18,8 @@ module Sentiero
 
       NAVIGATION_TAG = "navigation"
 
-      INTERNAL_METADATA_KEYS = %w[userAgent url referrer viewport has_errors entry_url entry_referrer].freeze
+      INTERNAL_METADATA_KEYS = %w[userAgent url referrer viewport has_errors entry_url entry_referrer
+        geo_country geo_city geo_region geo_timezone].freeze
 
       MAX_NAV_KEYS = 200
       MAX_METADATA_KEYS = 50
@@ -26,6 +27,7 @@ module Sentiero
       MAX_TAG_SERIES_KEYS = 200
       MAX_OVERLAY_PROBLEMS = 200
       MAX_OCCURRENCES_PER_PROBLEM = 500
+      MAX_GEO_VALUES = 200
 
       DURATION_BUCKETS = [
         ["0-30s", 30_000],
@@ -115,6 +117,7 @@ module Sentiero
       # methods rather than string-typed acc.key lookups.
       Accumulator = Struct.new(
         :event_types, :custom_tags, :browser_tags, :browsers, :devices,
+        :countries, :cities,
         :entry_pages, :entry_page_errors, :referrers, :duration_buckets,
         :total_events, :durations, :since, :until_time,
         :per_day_events, :per_day_sessions, :per_day_errors, :per_day_tags,
@@ -130,6 +133,8 @@ module Sentiero
           browser_tags: Hash.new(0),
           browsers: Hash.new(0),
           devices: Hash.new(0),
+          countries: Hash.new(0),
+          cities: Hash.new(0),
           entry_pages: Hash.new(0),
           entry_page_errors: Hash.new(0),
           referrers: Hash.new(0),
@@ -166,6 +171,7 @@ module Sentiero
         }
 
         tally_browser_device(acc, metadata["userAgent"])
+        tally_geo(acc, metadata)
         acc.sessions_with_errors += 1 if metadata["has_errors"]
 
         tally_metadata(acc, metadata)
@@ -226,6 +232,13 @@ module Sentiero
         device = UserAgent.device(user_agent)
         acc.browsers[browser] += 1 if browser
         acc.devices[device] += 1 if device
+      end
+
+      def tally_geo(acc, metadata)
+        country = metadata["geo_country"]
+        city = metadata["geo_city"]
+        bounded_tally(acc.countries, country, MAX_GEO_VALUES) if country.is_a?(String) && !country.empty?
+        bounded_tally(acc.cities, city, MAX_GEO_VALUES) if city.is_a?(String) && !city.empty?
       end
 
       def tally_custom_tag(acc, event)
