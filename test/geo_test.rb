@@ -66,17 +66,11 @@ class GeoTest < Minitest::Test
 
   def test_raising_proc_warns_only_once
     geo_proc = ->(_env) { raise "geo db down" }
-    _out, err1 = capture_io do
-      Sentiero::Geo.resolve({}, geo_proc)
-    end
-    assert_match(/geo_source raised/i, err1)
+    _out, first_err = capture_io { Sentiero::Geo.resolve({}, geo_proc) }
+    assert_match(/geo_source raised/i, first_err)
 
-    Sentiero::Geo.reset_proc_warning!
-
-    _out, err2 = capture_io do
-      Sentiero::Geo.resolve({}, geo_proc)
-    end
-    assert_match(/geo_source raised/i, err2)
+    _out, second_err = capture_io { Sentiero::Geo.resolve({}, geo_proc) }
+    assert_empty second_err
   end
 
   def test_values_stripped_and_truncated
