@@ -1,7 +1,7 @@
 PATH
   remote: ..
   specs:
-    sentiero (1.0.0.alpha1)
+    sentiero (1.0.0.alpha2)
       concurrent-ruby (~> 1.1)
       rack (>= 2.0, < 4.0)
 
