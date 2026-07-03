@@ -693,7 +693,7 @@ module Sentiero
       def test_raising_geo_source_does_not_break_ingest
         Sentiero.configuration.geo_source = ->(_env) { raise "geoip db missing" }
 
-        post "/", JSON.generate(valid_payload), {"CONTENT_TYPE" => "application/json"}
+        capture_io { post "/", JSON.generate(valid_payload), {"CONTENT_TYPE" => "application/json"} }
 
         assert_equal 200, last_response.status
       end
