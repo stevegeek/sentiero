@@ -84,8 +84,9 @@ module Sentiero
           metadata = metadata.merge("has_errors" => true)
         end
 
-        # Merged underneath the client's keys so a page-set metadata value is never clobbered.
-        metadata = Sentiero::Geo.resolve(env, Sentiero.configuration.geo_source).merge(metadata)
+        # Server geo wins so a page can't forge its location via geo_* keys.
+        resolved_geo = Sentiero::Geo.resolve(env, Sentiero.configuration.geo_source, metadata)
+        metadata = resolved_geo.merge(metadata.except(*Sentiero::Geo::TARGET_KEYS))
 
         unless metadata.empty?
           metadata = Sentiero::Redaction.redact_metadata(metadata, Sentiero.configuration.redaction)
