@@ -30,7 +30,7 @@ module Sentiero
       # foreign grammar mis-applied to it (unregistered -> generic, tier 3).
       def resolve(platform)
         if platform.nil? || platform.to_s.strip.empty?
-          @normalizers.fetch(default_platform, RUBY_NORMALIZER)
+          @normalizers.fetch(default_platform.to_s, RUBY_NORMALIZER)
         else
           @normalizers.fetch(platform.to_s, GENERIC_NORMALIZER)
         end

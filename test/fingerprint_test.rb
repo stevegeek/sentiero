@@ -118,6 +118,16 @@ class FingerprintTest < Minitest::Test
     assert_equal identity, with_raise
   end
 
+  def test_compute_falls_back_to_raw_capped_frame_when_normalizer_raises_system_stack_error
+    # SystemStackError subclasses Exception, not StandardError. A pathological
+    # (e.g. infinitely recursive) custom normalizer can raise it, and
+    # fingerprinting must never break ingest because of it.
+    recursing = ->(frame) { recursing.call(frame) }
+    with_raise = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14"], project: "app", normalizer: recursing)
+    identity = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14"], project: "app", normalizer: ->(f) { f })
+    assert_equal identity, with_raise
+  end
+
   def test_compute_coerces_non_string_normalizer_result
     to_int = ->(_frame) { 12345 }
     fp = Sentiero::Fingerprint.compute(exception_class: "E", backtrace: ["app/x.rb:14"], project: "app", normalizer: to_int)

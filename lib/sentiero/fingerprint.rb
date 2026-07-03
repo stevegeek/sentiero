@@ -54,10 +54,14 @@ module Sentiero
     # user-registered) normalizer so a broken or pathological callable can
     # never break fingerprinting: the frame is capped before and after
     # normalization, and any exception falls back to the raw capped frame.
+    # SystemStackError and NoMemoryError are non-StandardError exceptions a
+    # pathological normalizer can realistically raise (e.g. unbounded
+    # recursion); a bare `rescue Exception` is deliberately avoided so
+    # Interrupt/SystemExit still propagate.
     def safe_normalize(normalizer, frame)
       capped = frame[0, MAX_FRAME_LENGTH].strip
       normalizer.call(capped).to_s[0, MAX_FRAME_LENGTH]
-    rescue
+    rescue StandardError, SystemStackError, NoMemoryError
       capped
     end
   end
