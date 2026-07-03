@@ -45,7 +45,7 @@ Also:
 - Session metadata,  captures URL, browser, viewport, referrer (opt-in)
 - Navigation tracking,  automatic outbound link logging (opt-in)
 - Error capture,  JS errors recorded in the timeline (opt-in)
-- Custom events,  imperative JS API or declarative `data-sentiero-track-*` HTML attributes ([docs](https://sentiero.app/guide/custom-events/))
+- Custom events,  imperative JS API or declarative `data-sentiero-track-*` HTML attributes ([docs](https://www.sentiero.app/guide/custom-events/))
 - JSON export and shareable deep-links with timestamp
 - Replay enhancers,  click overlay, scroll-depth indicator, frustration annotations (rage/dead clicks), form-interaction detail in the activity sidebar, Web Vitals badges, and a has-errors session filter
 - Cross-session [Analytics](#analytics),  pages, segments, errors, heatmaps, scroll, and forms across all recorded sessions
@@ -141,7 +141,7 @@ Include in your HTML layout (before `</body>`):
 
 That's it. Sessions are now being recorded and viewable at `/sentiero/`.
 
-> **Using Rails?** The `sentiero-rails` gem adds ActiveRecord storage, a migration generator, and view helpers. See [the Rails guide](https://sentiero.app/guide/rails/) for the full guide.
+> **Using Rails?** The `sentiero-rails` gem adds ActiveRecord storage, a migration generator, and view helpers. See [the Rails guide](https://www.sentiero.app/guide/rails/) for the full guide.
 
 > **Going to production?** Read the [Production Checklist](#production-checklist) first.
 
@@ -180,7 +180,7 @@ Use route-level auth when you need `401`/`302` responses (e.g., HTTP Basic promp
 
 The events endpoint (`EventsApp`) is intentionally public,  it receives browser-generated rrweb data. Protect it with CORS (`cors_origins`), rate limiting, and payload size limits instead.
 
-See [the authentication guide](https://sentiero.app/guide/authentication/) for the full guide including Rails, Sinatra, and plain Rack examples.
+See [the authentication guide](https://www.sentiero.app/guide/authentication/) for the full guide including Rails, Sinatra, and plain Rack examples.
 
 ## Privacy
 
@@ -252,7 +252,7 @@ Sentiero ships a compliance toolkit for GDPR/CCPA-style obligations:
 - **Right to erasure** — `Sentiero.erase_sessions(ids)` / `Sentiero.erase_where(**filters)`, or `rake sentiero:erase` in Rails apps.
 - **Audit hook** — `config.audit_log` receives compliance-relevant events (opt-outs, erasures, purges) for your own logging.
 
-See [the privacy guide](https://sentiero.app/guide/privacy/) for the full privacy guide including cross-tab sessions, global recording options, and compliance details, and [Implementing Consent & Opt-Out](https://sentiero.app/guide/consent/) for step-by-step consent-banner, opt-out-toggle, and right-to-erasure recipes.
+See [the privacy guide](https://www.sentiero.app/guide/privacy/) for the full privacy guide including cross-tab sessions, global recording options, and compliance details, and [Implementing Consent & Opt-Out](https://www.sentiero.app/guide/consent/) for step-by-step consent-banner, opt-out-toggle, and right-to-erasure recipes.
 
 ## Analytics
 
@@ -272,7 +272,7 @@ Analytics are **compute-on-read**: there are no rollup tables, the analyzers que
 
 DashboardApp serves these routes automatically. To mount the analytics UI on its own, use the Roda helper `r.sentiero_analytics`.
 
-See [the analytics guide](https://sentiero.app/guide/analytics/) for details.
+See [the analytics guide](https://www.sentiero.app/guide/analytics/) for details.
 
 ## Shareable Replays
 
@@ -285,7 +285,7 @@ Both are gated by `config.shareable_replays` (default `false`); while disabled, 
 
 > **Security:** a share file is a full session dump that leaves your infrastructure. Treat it like any other export of recorded data and only enable sharing if that's acceptable for your privacy posture.
 
-See [the sharing guide](https://sentiero.app/guide/sharing/) for details.
+See [the sharing guide](https://www.sentiero.app/guide/sharing/) for details.
 
 ## Server-side Error Tracking
 
@@ -402,7 +402,7 @@ captures and re-raises unhandled exceptions, and reads the session/window
 cookies into context). Opt out with `Sentiero::Rails.configure { |c| c.reporter_middleware = false }`.
 For non-Rails apps, add the middleware yourself: `use Sentiero::Reporter::Middleware`.
 
-See [the error tracking guide](https://sentiero.app/guide/error-tracking/) for the full guide
+See [the error tracking guide](https://www.sentiero.app/guide/error-tracking/) for the full guide
 (architecture, the `/issues` and `/custom-events` dashboards, deployment, and
 the Crystal shard).
 
@@ -478,7 +478,7 @@ end
 | `capture_metadata` | `Boolean` | `false` | Capture page URL, browser, viewport, and referrer per session |
 | `capture_errors` | `Boolean` | `false` | Capture JS errors and unhandled promise rejections as timeline events |
 | `track_navigation` | `Boolean` | `false` | Automatically log outbound link clicks as custom events |
-| `track_custom_events` | `Boolean` | `false` | Enable declarative `data-sentiero-track-*` HTML attributes for custom events ([docs](https://sentiero.app/guide/custom-events/)) |
+| `track_custom_events` | `Boolean` | `false` | Enable declarative `data-sentiero-track-*` HTML attributes for custom events ([docs](https://www.sentiero.app/guide/custom-events/)) |
 | `track_forms` | `Boolean` | `false` | Capture real form submits as `__form_submit` events for form analytics (form `name`/`id` attributes + page URL — never values) |
 | `mask_all_inputs` | `Boolean` | `true` | Mask all form input values in recordings |
 | `mask_input_options` | `Hash` | `{}` | Per-input-type masking; `password: true` is always enforced |
@@ -602,7 +602,7 @@ Requires the `redis` gem.
 
 Implement the methods defined in `Sentiero::Store` and verify with the shared contract tests.
 
-See [the storage guide](https://sentiero.app/guide/storage/) for details on all backends, Redis data structures, and building custom stores.
+See [the storage guide](https://www.sentiero.app/guide/storage/) for details on all backends, Redis data structures, and building custom stores.
 
 ## Security
 
@@ -648,7 +648,7 @@ cd frontend && npm install && npm run build
 # Output: lib/sentiero/web/assets/vendor/recorder.js
 ```
 
-See [the recorder guide](https://sentiero.app/guide/recorder/) for details on the frontend recorder's batching, compression, and retry behavior.
+See [the recorder guide](https://www.sentiero.app/guide/recorder/) for details on the frontend recorder's batching, compression, and retry behavior.
 
 ### Testing
 
