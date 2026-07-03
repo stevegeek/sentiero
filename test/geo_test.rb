@@ -3,6 +3,10 @@
 require "test_helper"
 
 class GeoTest < Minitest::Test
+  def setup
+    Sentiero::Geo.reset_proc_warning!
+  end
+
   def cf_env(extra = {})
     {"HTTP_CF_IPCOUNTRY" => "DE"}.merge(extra)
   end
@@ -53,7 +57,26 @@ class GeoTest < Minitest::Test
   end
 
   def test_raising_proc_resolves_empty
-    assert_equal({}, Sentiero::Geo.resolve({}, ->(_env) { raise "geo db down" }))
+    _out, err = capture_io do
+      result = Sentiero::Geo.resolve({}, ->(_env) { raise "geo db down" })
+      assert_equal({}, result)
+    end
+    assert_match(/geo_source raised RuntimeError: geo db down/i, err)
+  end
+
+  def test_raising_proc_warns_only_once
+    geo_proc = ->(_env) { raise "geo db down" }
+    _out, err1 = capture_io do
+      Sentiero::Geo.resolve({}, geo_proc)
+    end
+    assert_match(/geo_source raised/i, err1)
+
+    Sentiero::Geo.reset_proc_warning!
+
+    _out, err2 = capture_io do
+      Sentiero::Geo.resolve({}, geo_proc)
+    end
+    assert_match(/geo_source raised/i, err2)
   end
 
   def test_values_stripped_and_truncated

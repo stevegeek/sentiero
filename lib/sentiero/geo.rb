@@ -7,6 +7,8 @@ module Sentiero
   # config.anonymize_ip is unaffected.
   module Geo
     MAX_VALUE_LENGTH = 256
+    PROC_WARNING_LOCK = Mutex.new
+    @proc_warning_emitted = false
 
     # CF-IPCountry ships with Cloudflare IP geolocation enabled; the other
     # headers require the "Add visitor location headers" managed transform,
@@ -59,11 +61,17 @@ module Sentiero
         acc[mapped] = value if mapped && value
       end
     rescue => e
-      unless @proc_warned
-        @proc_warned = true
-        warn "[Sentiero] geo_source raised #{e.class}: #{e.message}; skipping geo capture"
+      PROC_WARNING_LOCK.synchronize do
+        return {} if @proc_warning_emitted
+        @proc_warning_emitted = true
       end
+
+      warn "[Sentiero] geo_source raised #{e.class}: #{e.message}; skipping geo capture"
       {}
+    end
+
+    def reset_proc_warning!
+      @proc_warning_emitted = false
     end
 
     def clean(value)
