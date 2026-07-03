@@ -1,41 +1,27 @@
 ---
 title: Implementing Consent & Opt-Out
 nav_order: 3
-description: Step-by-step recipes for wiring a consent banner, an opt-out toggle, and a "delete my data" flow around Sentiero.
+description: Recipes for wiring a consent banner, an opt-out toggle, and a "delete my data" flow around Sentiero.
 ---
 
 # Implementing Consent & Opt-Out
 
-Sentiero ships the privacy *mechanics* — a consent-gateable script tag, an end-user
-opt-out API, Global Privacy Control handling, and programmatic erasure — but it does
-not ship a consent banner or a "delete my data" button. Consent UI is inseparable
-from your app's design, your consent-management platform, and the jurisdictions you
-serve, so the last mile is yours. This page is the wiring guide: copy-paste recipes
-for the three flows most deployments need, and a checklist to close out.
-
-Reference detail for every option used here lives in
-[Privacy & Masking](/guide/privacy/). None of this is legal advice; which flows you
-need depends on your lawful basis and your lawyers.
+Sentiero ships the privacy *mechanics* — a consent-gateable script tag, an end-user opt-out API, Global Privacy Control handling, and programmatic erasure — but no consent banner or "delete my data" button. That last mile depends on your app, your CMP, and your jurisdictions. This page is the wiring guide; option reference lives in [Privacy & Masking](/guide/privacy/). None of this is legal advice.
 
 ## Which Model Do You Need?
 
 | Model | What it means | When you need it |
 |-------|---------------|------------------|
-| **Consent-first** | Recording does not start until the visitor agrees; the script tag is not even rendered before then. | EU/UK visitors. `sentiero_sid` / `sentiero_wid` are not strictly-necessary cookies, so ePrivacy/PECR generally require prior consent. |
-| **Opt-out** | Recording starts by default; visitors can turn it off, and browsers signalling GPC are never recorded. | CCPA/CPRA-style regimes and jurisdictions without a prior-consent rule. |
+| **Consent-first** | The script tag isn't rendered until the visitor agrees. | EU/UK visitors: `sentiero_sid` / `sentiero_wid` are not strictly-necessary cookies, so ePrivacy/PECR generally require prior consent. |
+| **Opt-out** | Recording starts by default; visitors can turn it off, and GPC browsers are never recorded. | CCPA/CPRA-style regimes without a prior-consent rule. |
 
-The two compose: a typical EU deployment gates the script tag on consent *and*
-offers an opt-out toggle afterwards so a visitor can change their mind.
+They compose: a typical EU deployment gates the tag on consent *and* offers an opt-out toggle afterwards.
 
-**Why an opt-out toggle alone is not consent-first:** the recorder starts
-synchronously on script load, so by the time a visitor can click "stop recording"
-the initial DOM snapshot and early events have already been captured.
-`window.Sentiero.optOut()` is a post-hoc signal. For prior consent, gate the tag.
+An opt-out toggle alone is **not** consent-first: the recorder starts on script load, so the initial DOM snapshot is captured before anyone can click "stop". `window.Sentiero.optOut()` is a post-hoc signal. For prior consent, gate the tag.
 
 ## Recipe: Consent-First (Gate the Script Tag)
 
-Render `sentiero_script_tag` only once the visitor has consented. The consent state
-lives in a cookie your app owns:
+Render the script tag only once a consent cookie your app owns is set:
 
 ```erb
 <% if request.cookies["analytics_consent"] == "granted" %>
@@ -43,8 +29,7 @@ lives in a cookie your app owns:
 <% end %>
 ```
 
-A minimal banner sets that cookie and reloads, so the server renders the tag on the
-next request:
+A minimal banner sets the cookie and reloads, so the server renders the tag on the next request:
 
 ```html
 <div id="consent-banner" hidden>
@@ -71,39 +56,30 @@ next request:
 </script>
 ```
 
-Reloading after acceptance is deliberate: it is the simplest way to get the freshly
-rendered script tag executed (script tags injected into an already-loaded page via
-`innerHTML` do not run). If a reload is unacceptable, have your consent callback
-create the `<script>` elements programmatically — but the reload variant is harder
-to get wrong.
+The reload is deliberate: script tags injected into a loaded page via `innerHTML` don't run. Injecting `<script>` elements programmatically also works, but the reload variant is harder to get wrong.
 
-**With a consent-management platform (CMP):** the shape is identical — in the CMP's
-"analytics accepted" callback, set the cookie your template checks and reload:
+**With a CMP**, the shape is identical — in the "analytics accepted" callback, set the cookie your template checks and reload:
 
 ```js
-// Called by your CMP when the visitor accepts the analytics category.
 function onAnalyticsConsentGranted() {
   document.cookie = "analytics_consent=granted; path=/; max-age=31536000; SameSite=Lax";
   location.reload();
 }
 ```
 
-The [demo app](https://github.com/stevegeek/sentiero/tree/main/demo) implements this
-recipe end to end — first visit shows a banner, and the script tag renders only
-after acceptance.
+The [demo app](https://github.com/stevegeek/sentiero/tree/main/demo) implements this recipe end to end.
 
 ## Recipe: End-User Opt-Out Toggle
 
-Once recording is running (whether consent-gated or not), give visitors a switch to
-turn it off — typically in a privacy-settings page or footer. Enable the feature:
+Enable the feature:
 
 ```ruby
 Sentiero.configure do |config|
-  config.user_opt_out = true # exposes window.Sentiero.optOut() / optIn()
+  config.user_opt_out = true # activates window.Sentiero.optOut() / optIn()
 end
 ```
 
-then wire a toggle to the browser API:
+then wire a toggle (privacy-settings page, footer) to the browser API:
 
 ```html
 <button id="recording-toggle"></button>
@@ -129,43 +105,27 @@ then wire a toggle to the browser API:
 </script>
 ```
 
-What you get for free (details in
-[End-user opt-out](/guide/privacy/#end-user-opt-out)):
+What you get for free (details in [End-user opt-out](/guide/privacy/#end-user-opt-out)):
 
-- `optOut()` acts immediately — it stops rrweb and **drops** any buffered events
-  without sending them — and persists across visits via a cookie plus a
-  `localStorage` flag.
-- The server enforces the cookie too: a `POST` to the events endpoint carrying the
-  opt-out cookie stores nothing, even from a stale or tampered client.
-- An opt-out → opt-in cycle starts a fresh session; the old identifiers are cleared.
+- `optOut()` acts immediately: stops rrweb, **drops** buffered events unsent, and persists via a cookie plus a `localStorage` flag.
+- The server enforces the cookie: a `POST` carrying it stores nothing, even from a stale or tampered client.
+- An opt-out → opt-in cycle starts a fresh session; old identifiers are cleared.
 
-One caveat worth mirroring in your UI copy: the server reads only the **cookie**,
-the client reads cookie *and* `localStorage`. A visitor who "clears cookies" is
-still opted out until the `localStorage` flag is cleared — `optIn()` clears both,
-so steer users to the toggle rather than cookie-clearing.
+One caveat for your UI copy: the server reads only the **cookie**; the client reads cookie *and* `localStorage`. A visitor who clears cookies is still opted out client-side until `optIn()` clears both — steer users to the toggle, not cookie-clearing.
 
-**Global Privacy Control needs no wiring.** `config.respect_gpc` defaults to `true`:
-a browser sending the GPC signal is treated as opted out on both the client and the
-server before any events flow.
+**Global Privacy Control needs no wiring.** `config.respect_gpc` defaults to `true`: GPC browsers are treated as opted out on client and server before any events flow.
 
 ## Recipe: "Delete My Data" (Right to Erasure)
 
-Opting out stops *future* recording. It does not delete what was already stored, and
-Sentiero deliberately exposes **no public deletion endpoint** — the events endpoint
-is unauthenticated by design, and letting any browser delete sessions by
-client-supplied ID would be an abuse vector. Erasure is therefore a server-side,
-authenticated action in *your* app (an account-deletion hook, a DSAR admin screen),
-built in two steps.
+Opting out stops *future* recording only. Sentiero deliberately exposes **no public deletion endpoint** — the events endpoint is unauthenticated, and letting any browser delete sessions by client-supplied ID would be an abuse vector. Erasure is an authenticated, server-side action in *your* app (account-deletion hook, DSAR admin screen):
 
-**Step 1 — make sessions findable.** Session IDs are pseudonymous, so tag each
-recording with your user identifier once the visitor is signed in:
+**Step 1 — make sessions findable.** Session IDs are pseudonymous, so tag recordings once the visitor signs in:
 
 ```js
 window.Sentiero.setMetadata({ userId: "user-42" });
 ```
 
-**Step 2 — find and erase server-side.** Metadata is searchable through the store,
-so the erasure handler is a lookup plus one call:
+**Step 2 — find and erase server-side:**
 
 ```ruby
 def erase_recordings_for(user_id)
@@ -174,29 +134,14 @@ def erase_recordings_for(user_id)
 end
 ```
 
-`erase_sessions` returns the count actually deleted, is idempotent, and is audited
-via `config.audit_log` when set. `search:` does case-insensitive substring matching
-over session IDs and metadata values, so use identifiers that cannot collide
-(`"user-42"` also matches `"user-421"` — prefer opaque IDs or a delimited form like
-`"user:42:"`). Repeat the lookup until it returns nothing if a user may have more
-sessions than one page.
+`erase_sessions` is idempotent and returns the count actually deleted. It does **not** call `audit_log` (only dashboard operations are audited) — log erasures yourself where you call them. `search:` does case-insensitive substring matching over session IDs and metadata values, so use identifiers that can't collide (`"user-42"` also matches `"user-421"` — prefer opaque IDs or a delimited form). Repeat the lookup until it returns nothing if a user may exceed one page.
 
-Know the two erasure residues before you promise deletion: exported replay files
-live outside the store, and aggregated problem records from error tracking are
-retained (their titles may contain PII). Both are documented under
-[Right to erasure](/guide/privacy/#right-to-erasure-gdpr-art-17), along with the
-`erase_where` time-range variant and the `rake sentiero:erase` task.
+Two erasure residues to know before you promise deletion: exported replay files live outside the store, and aggregated problem records from error tracking are retained (titles may contain PII). See [Right to erasure](/guide/privacy/#right-to-erasure-gdpr-art-17) for both, plus the `erase_where` time-range variant and `rake sentiero:erase`.
 
 ## Retention and Audit
 
-Two more pieces round out the compliance story, both one-liners:
-
-- **Retention** — set `config.retention_period` (seconds) and schedule
-  `Sentiero.purge_expired!` (or `rake sentiero:purge`) so recordings age out instead
-  of accumulating forever. See [Data retention / purge](/guide/privacy/#data-retention--purge).
-- **Audit** — set `config.audit_log` to a callable and Sentiero reports opt-outs,
-  erasures, purges, and dashboard operations to it. See
-  [Audit logging](/guide/privacy/#audit-logging).
+- **Retention** — set `config.retention_period` (seconds) and schedule `Sentiero.purge_expired!` (or `rake sentiero:purge`) so recordings age out. See [Data retention / purge](/guide/privacy/#data-retention--purge).
+- **Audit** — set `config.audit_log` to a callable; the dashboard and analytics report sensitive operations (session views, deletions, exports, shares) to it. Programmatic erasure and purge are *not* routed through it — log those at their call sites. See [Audit logging](/guide/privacy/#audit-logging).
 
 ## Checklist
 
@@ -207,5 +152,5 @@ Two more pieces round out the compliance story, both one-liners:
 | Let users change their mind | `user_opt_out = true` + a toggle wired to `optOut()` / `optIn()` |
 | Right to erasure | Tag sessions via `setMetadata`, erase with `Sentiero.erase_sessions` on account deletion / DSAR |
 | Storage limitation | Set `retention_period` and schedule the purge |
-| Accountability | Wire `config.audit_log`; document recording in your privacy notice and ROPA ([data categories](/guide/privacy/#privacy-notice--ropa)) |
-| Data minimization | Review the [masking and redaction defaults](/guide/privacy/) — they're on, keep them on |
+| Accountability | Wire `config.audit_log` for dashboard access; log your own erasure/purge calls; document recording in your privacy notice and ROPA ([data categories](/guide/privacy/#privacy-notice--ropa)) |
+| Data minimization | The [masking and redaction defaults](/guide/privacy/) are on — keep them on |
