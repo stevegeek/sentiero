@@ -6,6 +6,7 @@ require "roda"
 require "securerandom"
 require "sentiero"
 require "sentiero/roda"
+require "sentiero/reporter/middleware"
 
 def build_store
   if ENV["REDIS_URL"]
@@ -57,12 +58,37 @@ Sentiero.configure do |config|
   # Customize via config.redaction (custom_patterns, server_proc, url_mode).
 end
 
+# Server-side error reporting: the reporter POSTs to this same demo's ingest
+# endpoint (ErrorsApp under /sentiero/errors). Dispatch is async, so the
+# self-request can't deadlock the thread that's handling the failing request.
+Sentiero::Reporter.configure do |config|
+  config.endpoint = "http://localhost:#{ENV.fetch("PORT", 9292)}/sentiero"
+  config.ingest_key = "demo-ingest-key"
+  config.project = "demo"
+  config.environment = "demo"
+end
+
 class TodoApp < Roda
+  # Supplies request/session context to Reporter.notify and reports any error
+  # that escapes Roda entirely.
+  use Sentiero::Reporter::Middleware
+
   plugin :sentiero
   plugin :render, engine: "erb", views: File.join(__dir__, "views")
   plugin :sessions, secret: ENV.fetch("SESSION_SECRET"), key: "todo.session"
   plugin :route_csrf
   plugin :h
+
+  # Roda rescues exceptions before the reporter middleware can see them, so
+  # the handler notifies explicitly (still inside the middleware's context),
+  # then renders a friendly page instead of a bare 500.
+  plugin :error_handler do |e|
+    Sentiero::Reporter.notify(e)
+    response.status = 500
+    @page_title = "Server error — Trailhead"
+    @error = e
+    view "error"
+  end
 
   route do |r|
     r.on "sentiero" do
@@ -89,12 +115,29 @@ class TodoApp < Roda
 
     session["todos"] ||= []
 
+    # The interactive todo app is the front page so a visitor immediately
+    # sees what the demo is and can start triggering recorded events
+    # (adding a todo fires the `todo_created` custom event, funnel step 4).
+    r.root do
+      @page_title = "Todos — Trailhead"
+      @user_name = session["user_name"]
+      @todos = session["todos"]
+      view "todos"
+    end
+
     # Marketing landing page: long + scrollable so scroll-depth and
     # page-position heatmaps have something to show. CTA fires `cta_clicked`.
-    r.root do
+    r.get "landing" do
       @page_title = "Trailhead — Sentiero Demo"
       @full_width = true
       view "landing"
+    end
+
+    # Raises on purpose: exercises Reporter.notify → ErrorsApp → the
+    # dashboard's Issues tab from a button on the front page.
+    r.post "boom" do
+      check_csrf!
+      raise "Trailhead demo error — raised on purpose from the demo page"
     end
 
     # Signup form: fires `plan_selected` (on plan change, numeric price
@@ -110,17 +153,13 @@ class TodoApp < Roda
         name = r.params["name"]&.strip
         session["user_name"] = name if name && !name.empty?
         session["plan"] = r.params["plan"]
-        r.redirect "/app"
+        r.redirect "/"
       end
     end
 
-    # The todo app itself (the funnel's activation step lives here:
-    # adding a todo fires `todo_created`).
+    # The todo app used to live here; keep old links working.
     r.get "app" do
-      @page_title = "Todos — Trailhead"
-      @user_name = session["user_name"]
-      @todos = session["todos"]
-      view "todos"
+      r.redirect "/"
     end
 
     r.post "todos" do
@@ -134,20 +173,20 @@ class TodoApp < Roda
           "created_at" => Time.now.to_s
         }
       end
-      r.redirect "/app"
+      r.redirect "/"
     end
 
     r.post "todos", String, "toggle" do |id|
       check_csrf!
       todo = session["todos"].find { |t| t["id"] == id }
       todo["done"] = !todo["done"] if todo
-      r.redirect "/app"
+      r.redirect "/"
     end
 
     r.post "todos", String, "delete" do |id|
       check_csrf!
       session["todos"].reject! { |t| t["id"] == id }
-      r.redirect "/app"
+      r.redirect "/"
     end
   end
 end
