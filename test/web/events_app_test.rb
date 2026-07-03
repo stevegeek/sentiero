@@ -681,11 +681,29 @@ module Sentiero
         assert_equal "PT", Sentiero.store.get_session("sess-1")[:metadata]["geo_country"]
       end
 
-      def test_client_metadata_wins_over_server_geo_on_conflict
+      def test_server_geo_wins_over_forged_client_geo_key
         Sentiero.configuration.geo_source = :cloudflare
 
         post "/", JSON.generate(valid_payload.merge("metadata" => {"geo_country" => "custom"})),
           {"CONTENT_TYPE" => "application/json", "HTTP_CF_IPCOUNTRY" => "DE"}
+
+        assert_equal "DE", Sentiero.store.get_session("sess-1")[:metadata]["geo_country"]
+      end
+
+      def test_client_geo_key_stripped_when_no_geo_source
+        post "/", JSON.generate(valid_payload.merge("metadata" => {"geo_country" => "custom", "plan" => "pro"})),
+          {"CONTENT_TYPE" => "application/json"}
+
+        metadata = Sentiero.store.get_session("sess-1")[:metadata]
+        refute metadata.key?("geo_country"), "client-supplied geo_country must not be trusted"
+        assert_equal "pro", metadata["plan"]
+      end
+
+      def test_two_arg_geo_proc_may_opt_into_client_geo
+        Sentiero.configuration.geo_source = ->(_env, client_metadata) { {"country" => client_metadata["geo_country"]} }
+
+        post "/", JSON.generate(valid_payload.merge("metadata" => {"geo_country" => "custom"})),
+          {"CONTENT_TYPE" => "application/json"}
 
         assert_equal "custom", Sentiero.store.get_session("sess-1")[:metadata]["geo_country"]
       end
