@@ -1,0 +1,8 @@
+---
+# CVE-2026-38969 / GHSA-h4w6-wx8r-p68v: WEBrick trailer reparse. webrick is a
+# transitive dependency of ferrum (Cuprite system tests, dev/test group only);
+# it never serves traffic in the shipped gems. No patched webrick release
+# exists yet (latest is the affected 1.9.2) — drop this ignore once one ships.
+ignore:
+  - CVE-2026-38969
+  - GHSA-h4w6-wx8r-p68v
