@@ -7,12 +7,18 @@
 <div class="mb-8 p-4 bg-blue-50 rounded-lg text-sm text-blue-900 leading-relaxed">
   <strong class="block mb-1">👋 You're looking at the Sentiero demo</strong>
   Trailhead is a toy todo app instrumented with
-  <a href="https://github.com/stevegeek/sentiero" class="underline">Sentiero</a> session recording.
-  Once you accept the consent banner, everything you do here is recorded: add some
-  todos, trigger the errors below, wander through the
+  <a href="https://github.com/stevegeek/sentiero" class="underline">Sentiero</a> session recording:
+  add some todos, trigger the errors below, wander through the
   <a href="/landing" class="underline">landing page</a> and
   <a href="/signup" class="underline">signup flow</a> &mdash; then watch it all back in the
   <a href="/sentiero/dashboard/" class="underline font-semibold">dashboard</a> (login: demo / demo).
+  <% if request.cookies["sentiero_demo_consent"] == "granted" %>
+    <strong class="block mt-2">🔴 Recording is on &mdash; this session will show up in the dashboard.</strong>
+  <% elsif request.cookies.key?("sentiero_demo_consent") %>
+    <strong class="block mt-2">Recording is off &mdash; you declined consent, so nothing is captured. Clear this site's cookies to bring the consent banner back.</strong>
+  <% else %>
+    <strong class="block mt-2">⚠️ Nothing is recorded yet &mdash; you must accept the consent banner at the bottom of the page first, or your session won't appear in the dashboard.</strong>
+  <% end %>
 </div>
 
 <!-- Adding a todo fires the `todo_created` custom event (funnel step 4)
