@@ -12,8 +12,14 @@
   <a href="/landing" class="underline">landing page</a> and
   <a href="/signup" class="underline">signup flow</a> &mdash; then watch it all back in the
   <a href="/sentiero/dashboard/" class="underline font-semibold">dashboard</a> (login: demo / demo).
-  <% if request.cookies["sentiero_demo_consent"] == "granted" %>
-    <strong class="block mt-2">🔴 Recording is on &mdash; this session will show up in the dashboard.</strong>
+  <%# Opt-out beats consent, mirroring the recorder's truthy rule (set unless
+      ""/0/false) and the opt-out widget below. A localStorage-only opt-out is
+      invisible server-side, but optOut() always sets the cookie too and the
+      widget reloads after toggling, so the states can't drift in practice. %>
+  <% if !["", "0", "false", nil].include?(request.cookies["sentiero_optout"]) %>
+    <strong class="block mt-2">Recording is off &mdash; you opted out. Use the recording opt-out section at the bottom of this page to opt back in.</strong>
+  <% elsif request.cookies["sentiero_demo_consent"] == "granted" %>
+    <strong class="block mt-2">🟢 Recording is on &mdash; this session will show up in the dashboard.</strong>
   <% elsif request.cookies.key?("sentiero_demo_consent") %>
     <strong class="block mt-2">Recording is off &mdash; you declined consent, so nothing is captured. Clear this site's cookies to bring the consent banner back.</strong>
   <% else %>
