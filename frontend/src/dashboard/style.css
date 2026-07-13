@@ -810,16 +810,49 @@
    ═══════════════════════════════════════ */
 
 @media (max-width: 768px) {
+  .s-layout {
+    @apply flex-col;
+  }
+
   .s-sidebar {
     @apply hidden;
   }
 
   .s-mobile-header {
-    @apply flex;
+    @apply flex flex-wrap gap-2;
   }
 
+  .s-mobile-header nav {
+    @apply overflow-x-auto max-w-full;
+  }
+
+  /* min-w-0 lets this flex child shrink to the viewport, so a wide descendant
+     scrolls locally instead of stretching the whole page. */
   .s-main {
-    @apply ml-0 p-4;
+    @apply ml-0 p-4 min-w-0;
+  }
+
+  .tabs {
+    @apply overflow-x-auto;
+  }
+
+  .s-main table {
+    @apply block overflow-x-auto whitespace-nowrap max-w-full;
+  }
+
+  .s-main form,
+  .s-main .flex:has(> .shrink-0) {
+    @apply flex-wrap;
+  }
+
+  .s-main form .shrink-0 {
+    @apply w-full;
+  }
+
+  /* !important: fields carry fixed inline widths (width:22rem) that outrank a class. */
+  .s-main .input[style],
+  .s-main .select[style] {
+    width: 100% !important;
   }
 }
 
