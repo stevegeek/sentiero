@@ -69,6 +69,33 @@ module Sentiero
         assert_equal 1, events.size
       end
 
+      # Unload beacons ship gzip as text/plain with no Content-Encoding header
+      # (that header would force a CORS preflight sendBeacon can't perform), so
+      # the server must detect the compression from the gzip magic bytes.
+      def test_post_gzip_without_content_encoding_header_returns_200
+        json = JSON.generate(valid_payload)
+        compressed = gzip_compress(json)
+
+        post "/", compressed, {"CONTENT_TYPE" => "text/plain"}
+
+        assert_equal 200, last_response.status
+        body = JSON.parse(last_response.body)
+        assert_equal "ok", body["status"]
+
+        events = Sentiero.store.get_events(Sentiero::WindowRef.new("sess-1", "win-1"))
+        assert_equal 1, events.size
+      end
+
+      # A gzip bomb without the header must still hit the decompressed-size cap.
+      def test_post_gzip_bomb_without_header_returns_413
+        large_json = JSON.generate(valid_payload.merge("events" => [{"type" => 3, "data" => "x" * 600_000}]))
+        compressed = gzip_compress(large_json)
+
+        post "/", compressed, {"CONTENT_TYPE" => "text/plain"}
+
+        assert_equal 413, last_response.status
+      end
+
       def test_post_oversized_body_returns_413
         oversized = valid_payload.merge("events" => [{"data" => "x" * 600_000}])
         post "/", JSON.generate(oversized), {"CONTENT_TYPE" => "application/json"}

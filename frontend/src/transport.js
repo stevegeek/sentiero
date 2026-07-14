@@ -175,15 +175,18 @@ export class Transport {
     this._sendBeaconChunk(events, customMetadata);
   }
 
-  // Recursively halves an over-sized batch so ALL events are delivered on
-  // unload, not just the first half. Metadata rides the first chunk only.
+  // Gzipped and sent as a text/plain Blob with no Content-Encoding header, so
+  // it stays a CORS-safelisted request (no preflight, which sendBeacon can't
+  // do) and reaches a cross-origin collector, while compression keeps it under
+  // the shared ~64KB beacon quota; the server detects the gzip from its magic
+  // bytes. Oversized batches halve recursively; metadata rides the first chunk.
   _sendBeaconChunk(events, customMetadata) {
     if (events.length === 0) return;
 
     const payload = this._buildPayload(events, customMetadata);
     let blob;
     try {
-      blob = new Blob([payload], { type: "application/json" });
+      blob = new Blob([gzipSync(new TextEncoder().encode(payload))], { type: "text/plain" });
     } catch (err) {
       console.warn("[Sentiero] beacon failed:", err);
       return;
@@ -196,8 +199,10 @@ export class Transport {
       return;
     }
 
+    // A rejection means the shared keepalive quota is exhausted; a keepalive
+    // fetch would draw on the same budget, so there is no retry that helps.
     if (!navigator.sendBeacon(this.eventsUrl, blob)) {
-      console.warn("[Sentiero] sendBeacon rejected, events may be lost");
+      console.warn("[Sentiero] beacon rejected (quota exhausted), events may be lost");
     }
   }
 
