@@ -22,7 +22,7 @@ end
 
 Sentiero reads `CF-IPCountry`, `CF-IPCity`, `CF-Region`, and `CF-Timezone`, skipping Cloudflare's `XX` (unknown) and `T1` (Tor) markers. Country-only capture (no managed transform) is fine — the other fields just stay unset.
 
-> **Caveat:** only set `:cloudflare` when requests genuinely arrive through Cloudflare. If clients can reach your origin directly, they can spoof these headers.
+> **Caveat:** only set `:cloudflare` when requests genuinely arrive through Cloudflare. If clients can reach your origin directly, they can spoof these headers — lock the origin to Cloudflare's IP ranges (or enable Authenticated Origin Pulls) so the headers are trustworthy.
 
 ## Any other source
 
@@ -49,6 +49,12 @@ end
 
 A resolver that raises or returns something other than a Hash is ignored (with a one-time warning) — geo problems never break event ingest.
 
+Client-supplied `geo_*` metadata is never trusted by default, so a page cannot forge its own location. If you *do* want a resolver to use page-provided data, declare a second parameter and it receives the client metadata — an explicit, server-side opt-in:
+
+```ruby
+config.geo_source = ->(env, client_metadata) { {"country" => client_metadata["geo_country"]} }
+```
+
 ## Where it shows up
 
 Resolved values are stored as `geo_country`, `geo_city`, `geo_region`, and `geo_timezone` in the session's metadata:
@@ -57,4 +63,4 @@ Resolved values are stored as `geo_country`, `geo_city`, `geo_region`, and `geo_
 - **Segments** — a Country filter dropdown; filter by city with the generic metadata filter (`metadata_key=geo_city`).
 - **Session detail** — in the session's metadata panel.
 
-If a recorded page sets the same key via `setMetadata()`, the page's value wins.
+Server-resolved geo is authoritative for these keys — a page setting `geo_country` (or the others) via `setMetadata()` is ignored, unless a two-argument resolver explicitly opts into the page's value (above).

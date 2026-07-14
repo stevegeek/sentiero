@@ -145,7 +145,8 @@ module Sentiero
           "message" => Redaction.redact_text(exception.message.to_s, config),
           "backtrace" => Array(exception.backtrace).map { |frame| Redaction.redact_text(frame.to_s, config) },
           "context" => Redaction.deep_redact_strings(scrubber.scrub(report_ctx.metadata), config),
-          "timestamp" => Time.now.to_f
+          "timestamp" => Time.now.to_f,
+          "platform" => "ruby"
         }
         payload["session_id"] = report_ctx.session_id if report_ctx.session_id
         payload["window_id"] = report_ctx.window_id if report_ctx.window_id

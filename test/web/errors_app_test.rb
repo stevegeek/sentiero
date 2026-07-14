@@ -119,6 +119,76 @@ module Sentiero
         context = Sentiero.store.get_occurrences(fp).first["context"]
         assert_equal "203.0.113.42", context["request"]["ip"]
       end
+
+      def test_platform_absent_stores_no_platform_key
+        post "/", JSON.generate(payload), auth
+        fp = JSON.parse(last_response.body)["fingerprint"]
+        refute Sentiero.store.get_occurrences(fp).first.key?("platform")
+      end
+
+      def test_valid_platform_is_persisted_on_the_occurrence
+        post "/", JSON.generate(payload("platform" => "crystal")), auth
+        fp = JSON.parse(last_response.body)["fingerprint"]
+        assert_equal "crystal", Sentiero.store.get_occurrences(fp).first["platform"]
+      end
+
+      def test_mixed_case_platform_is_persisted_downcased
+        post "/", JSON.generate(payload("platform" => "Crystal")), auth
+        fp = JSON.parse(last_response.body)["fingerprint"]
+        assert_equal "crystal", Sentiero.store.get_occurrences(fp).first["platform"]
+      end
+
+      def test_crystal_platform_uses_the_crystal_normalizer_for_grouping
+        # Same Crystal frame at two different lines/columns: the `ruby`
+        # normalizer (tier-1 default) would treat these as distinct fingerprints
+        # since Crystal's " in " grammar doesn't match the Ruby `:in` regex; the
+        # `crystal` normalizer collapses both to the same fingerprint.
+        post "/", JSON.generate(payload("platform" => "crystal", "backtrace" => ["src/app.cr:451 in 'a'"])), auth
+        fp1 = JSON.parse(last_response.body)["fingerprint"]
+
+        post "/", JSON.generate(payload("platform" => "crystal", "backtrace" => ["src/app.cr:5:3 in 'a'"])), auth
+        fp2 = JSON.parse(last_response.body)["fingerprint"]
+
+        assert_equal fp1, fp2, "crystal frames differing only in line/col should group together"
+
+        problems = Sentiero.store.list_problems(project: "app", limit: 10)
+        assert_equal 1, problems.size
+        assert_equal 2, problems.first[:count]
+      end
+
+      def test_same_crystal_backtraces_without_platform_do_not_group
+        # Without the platform tag, the ruby normalizer is a no-op on Crystal's
+        # ` in ` grammar, so these two frames remain distinct fingerprints —
+        # the contrast case proving the platform tag matters.
+        post "/", JSON.generate(payload("backtrace" => ["src/app.cr:451 in 'a'"])), auth
+        fp1 = JSON.parse(last_response.body)["fingerprint"]
+
+        post "/", JSON.generate(payload("backtrace" => ["src/app.cr:5:3 in 'a'"])), auth
+        fp2 = JSON.parse(last_response.body)["fingerprint"]
+
+        refute_equal fp1, fp2
+      end
+
+      def test_invalid_platform_with_spaces_is_treated_as_absent
+        post "/", JSON.generate(payload("platform" => "has spaces")), auth
+        assert_equal 200, last_response.status
+        fp = JSON.parse(last_response.body)["fingerprint"]
+        refute Sentiero.store.get_occurrences(fp).first.key?("platform")
+      end
+
+      def test_invalid_platform_too_long_is_treated_as_absent
+        post "/", JSON.generate(payload("platform" => "x" * 40)), auth
+        assert_equal 200, last_response.status
+        fp = JSON.parse(last_response.body)["fingerprint"]
+        refute Sentiero.store.get_occurrences(fp).first.key?("platform")
+      end
+
+      def test_non_string_platform_is_treated_as_absent
+        post "/", JSON.generate(payload("platform" => 123)), auth
+        assert_equal 200, last_response.status
+        fp = JSON.parse(last_response.body)["fingerprint"]
+        refute Sentiero.store.get_occurrences(fp).first.key?("platform")
+      end
     end
   end
 end
