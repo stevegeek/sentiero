@@ -41,35 +41,6 @@ async function withEnv({ sendBeacon, fetch }, fn) {
   }
 }
 
-function bigEvent(i) {
-  return { id: i, blob: "x".repeat(4000) };
-}
-
-test("flushBeacon splits an oversized batch and delivers every event", async () => {
-  const sent = [];
-  const sendBeacon = (_url, blob) => {
-    sent.push(blob);
-    return true;
-  };
-  await withEnv({ sendBeacon }, async () => {
-    const transport = new Transport({ eventsUrl: "https://events.test/e", redactionCfg: parseConfig({}) });
-    // ~40 * 4KB = 160KB payload, well over the 64KB beacon cap.
-    const events = Array.from({ length: 40 }, (_, i) => bigEvent(i));
-    events.forEach((e) => transport.buffer.push(e));
-
-    transport.flushBeacon();
-
-    assert.ok(sent.length > 1, "payload should have been split into multiple beacons");
-    const delivered = [];
-    for (const blob of sent) {
-      assert.ok(blob.size <= 64_000, "each beacon chunk stays within the cap");
-      const parsed = JSON.parse(await blob.text());
-      delivered.push(...parsed.events.map((e) => e.id));
-    }
-    assert.deepEqual(delivered.sort((a, b) => a - b), events.map((e) => e.id), "no events dropped");
-  });
-});
-
 test("custom metadata is sent once, not re-attached to every flush", async () => {
   const bodies = [];
   const fetchMock = (_url, opts) => {

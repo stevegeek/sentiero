@@ -26,7 +26,7 @@ module Sentiero
         env["rack.input"].rewind if env["rack.input"].respond_to?(:rewind)
         return [nil, :too_large] if raw.bytesize > MAX_BODY_SIZE
 
-        if env["HTTP_CONTENT_ENCODING"]&.downcase == "gzip"
+        if gzip?(env, raw)
           begin
             gz = Zlib::GzipReader.new(StringIO.new(raw))
             raw = gz.read(MAX_BODY_SIZE + 1) || ""
@@ -38,6 +38,16 @@ module Sentiero
         end
 
         [raw, nil]
+      end
+
+      # Decompress when the client declared gzip or the body starts with the
+      # gzip magic number. The magic-byte path lets unload beacons ship
+      # compressed as text/plain without a Content-Encoding header, which would
+      # otherwise force a CORS preflight sendBeacon can't perform. JSON never
+      # begins with these bytes, so detection is unambiguous.
+      def gzip?(env, raw)
+        env["HTTP_CONTENT_ENCODING"]&.downcase == "gzip" ||
+          (raw.getbyte(0) == 0x1f && raw.getbyte(1) == 0x8b)
       end
     end
   end
