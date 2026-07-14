@@ -28,13 +28,15 @@ module Sentiero
       "timezone" => "geo_timezone"
     }.freeze
 
+    TARGET_KEYS = PROC_KEY_MAP.values.freeze
+
     module_function
 
-    def resolve(env, source)
+    def resolve(env, source, client_metadata = {})
       case source
       when nil then {}
       when :cloudflare then from_cloudflare(env)
-      else from_proc(env, source)
+      else from_proc(env, source, client_metadata)
       end
     end
 
@@ -48,9 +50,9 @@ module Sentiero
     end
 
     # A broken geo hook must never break ingest: rescue everything, warn once
-    # per process, resolve empty.
-    def from_proc(env, source)
-      raw = source.call(env)
+    # per process, resolve empty. A two-arg resolver opts into the client metadata.
+    def from_proc(env, source, client_metadata = {})
+      raw = (source.arity == 1) ? source.call(env) : source.call(env, client_metadata)
       return {} unless raw.is_a?(Hash)
 
       raw.each_with_object({}) do |(key, value), acc|

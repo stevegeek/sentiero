@@ -13,6 +13,7 @@ module Sentiero
       MAX_BACKTRACE_FRAMES = 100
       MAX_MESSAGE_LENGTH = 4000
       MAX_CONTEXT_BYTES = 16_384
+      PLATFORM_PATTERN = /\A[a-z0-9_-]{1,32}\z/i
 
       private
 
@@ -46,11 +47,14 @@ module Sentiero
         backtrace &&= backtrace.map { |frame| Redaction.redact_text(frame, redaction) }
 
         timestamp = numeric_timestamp(data["timestamp"])
+        platform = valid_platform(data["platform"])
+        normalizer = Sentiero.configuration.fingerprint.resolve(platform)
 
         fingerprint = Fingerprint.compute(
           exception_class: exception_class,
           backtrace: backtrace,
-          project: project
+          project: project,
+          normalizer: normalizer
         )
 
         occurrence = {
@@ -67,6 +71,7 @@ module Sentiero
         end
         occurrence["session_id"] = session_id if session_id
         occurrence["window_id"] = window_id if window_id
+        occurrence["platform"] = platform if platform
 
         begin
           Sentiero.store.save_occurrence(occurrence)
@@ -75,6 +80,14 @@ module Sentiero
         end
 
         json_response(200, {status: "ok", fingerprint: fingerprint})
+      end
+
+      # Anything not matching PLATFORM_PATTERN is treated as absent (tier 1:
+      # default_platform's normalizer), not rejected — an unrecognized tag is a
+      # reporter quirk, not a malformed request. Downcased so storage/resolve
+      # use one canonical form.
+      def valid_platform(raw)
+        (raw.is_a?(String) && PLATFORM_PATTERN.match?(raw)) ? raw.downcase : nil
       end
 
       def capped_context(context)

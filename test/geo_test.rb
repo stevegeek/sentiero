@@ -83,4 +83,16 @@ class GeoTest < Minitest::Test
     source = ->(_env) { {"country" => "US", "city" => "   "} }
     assert_equal({"geo_country" => "US"}, Sentiero::Geo.resolve({}, source))
   end
+
+  def test_two_arity_proc_receives_client_metadata
+    source = ->(_env, client_metadata) { {"country" => client_metadata["geo_country"]} }
+    geo = Sentiero::Geo.resolve({}, source, {"geo_country" => "US"})
+    assert_equal({"geo_country" => "US"}, geo)
+  end
+
+  def test_one_arity_proc_never_sees_client_metadata
+    source = ->(env) { {"country" => env["HTTP_X_COUNTRY"]} }
+    geo = Sentiero::Geo.resolve({"HTTP_X_COUNTRY" => "PT"}, source, {"geo_country" => "US"})
+    assert_equal({"geo_country" => "PT"}, geo)
+  end
 end
