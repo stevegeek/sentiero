@@ -560,6 +560,36 @@ module StoreContractTests
     assert_equal %w[s3 s2], seen
   end
 
+  def test_each_session_events_types_filter_yields_only_matching_events
+    @store.save_events(ref("s1", "w1"), [
+      make_event(timestamp: 1000.0, type: 2, data: {"node" => {"big" => "snapshot"}}),
+      make_event(timestamp: 1001.0, type: 3, data: {"source" => 1}),
+      make_event(timestamp: 1002.0, type: 4, data: {"href" => "https://example.test/"}),
+      make_event(timestamp: 1003.0, type: 5, data: {"tag" => "navigation"})
+    ])
+
+    captured = nil
+    @store.each_session_events(types: [4, 5]) { |_session, _wid, evts| captured = evts }
+
+    assert_equal [4, 5], captured.map { |event| event["type"] }
+  end
+
+  def test_each_session_events_types_filter_keeps_full_summary_counts
+    @store.save_events(ref("s1", "w1"), [
+      make_event(timestamp: 1000.0, type: 2),
+      make_event(timestamp: 1001.0, type: 3),
+      make_event(timestamp: 1002.0, type: 5)
+    ])
+
+    summaries = []
+    @store.each_session_events(types: [5]) { |session, _wid, _evts| summaries << session }
+
+    # The filter narrows the yielded events, not the session's identity: the
+    # summary still reports the session's real size and windows.
+    assert_equal 3, summaries.first[:event_count]
+    assert_equal ["w1"], summaries.first[:window_ids]
+  end
+
   def test_each_session_events_returns_enumerator_without_block
     @store.save_events(ref("s1", "w1"), [make_event(timestamp: 1.0)])
 

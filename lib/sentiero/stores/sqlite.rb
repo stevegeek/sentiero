@@ -90,10 +90,12 @@ module Sentiero
             )
           end
 
-          stmt = db.prepare("INSERT INTO events (session_id, window_id, timestamp, data) VALUES (?, ?, ?, ?)")
+          stmt = db.prepare("INSERT INTO events (session_id, window_id, timestamp, type, data) VALUES (?, ?, ?, ?, ?)")
           begin
             events.each do |event|
-              stmt.execute(session_id, window_id, event["timestamp"]&.to_f, JSON.generate(event))
+              type = event["type"]
+              stmt.execute(session_id, window_id, event["timestamp"]&.to_f,
+                type.is_a?(Integer) ? type : nil, JSON.generate(event))
             end
           ensure
             stmt.close
@@ -109,20 +111,36 @@ module Sentiero
       # Batched scan: avoids the base's get_session + get_events-per-window N+1.
       SCAN_IN_CHUNK = 500
 
-      def each_session_events(limit: nil, since: nil, until_time: nil)
-        return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time) unless block_given?
+      def each_session_events(limit: nil, since: nil, until_time: nil, types: nil)
+        unless block_given?
+          return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time, types: types)
+        end
 
         cap = limit || limits.analytics_max_scan_sessions
         rows = scan_session_rows(cap, since, until_time)
         return if rows.empty?
 
-        events = events_by_session_window(rows.map { |row| row["session_id"] })
+        session_ids = rows.map { |row| row["session_id"] }
+        events = events_by_session_window(session_ids, types: types)
+        # Summaries always describe the whole session (real event counts and
+        # window list), so a typed scan reports the same shape as a full one —
+        # including windows whose every event was filtered out.
+        shapes = types ? window_shapes(session_ids) : nil
+
         rows.each do |row|
           windows = events[row["session_id"]]
-          next unless windows
+          if types
+            shape = shapes[row["session_id"]]
+            next unless shape
 
-          summary = scan_summary(row, windows)
-          windows.each { |window_id, window_events| yield summary, window_id, window_events }
+            summary = scan_summary(row, shape.keys, shape.values.sum)
+            shape.each_key { |window_id| yield summary, window_id, windows&.fetch(window_id, nil) || [] }
+          else
+            next unless windows
+
+            summary = scan_summary(row, windows.keys, windows.values.sum(&:size))
+            windows.each { |window_id, window_events| yield summary, window_id, window_events }
+          end
         end
       end
 
@@ -483,13 +501,20 @@ module Sentiero
         )
       end
 
-      def events_by_session_window(session_ids)
+      def events_by_session_window(session_ids, types: nil)
+        type_clause = ""
+        type_params = []
+        if types
+          type_clause = " AND type IN (#{(["?"] * types.size).join(",")})"
+          type_params = types.map(&:to_i)
+        end
+
         grouped = Hash.new { |h, sid| h[sid] = {} }
         session_ids.each_slice(SCAN_IN_CHUNK) do |chunk|
           placeholders = (["?"] * chunk.size).join(",")
           db.execute(
-            "SELECT session_id, window_id, data FROM events WHERE session_id IN (#{placeholders}) ORDER BY timestamp ASC",
-            chunk
+            "SELECT session_id, window_id, data FROM events WHERE session_id IN (#{placeholders})#{type_clause} ORDER BY timestamp ASC",
+            chunk + type_params
           ).each do |row|
             (grouped[row["session_id"]][row["window_id"]] ||= []) << JSON.parse(row["data"])
           end
@@ -497,11 +522,28 @@ module Sentiero
         grouped
       end
 
-      def scan_summary(row, windows)
+      # {session_id => {window_id => event_count}} for the scanned sessions —
+      # index-only, so a typed scan can report full-session summaries without
+      # reading any payloads.
+      def window_shapes(session_ids)
+        shapes = Hash.new { |h, sid| h[sid] = {} }
+        session_ids.each_slice(SCAN_IN_CHUNK) do |chunk|
+          placeholders = (["?"] * chunk.size).join(",")
+          db.execute(
+            "SELECT session_id, window_id, COUNT(*) AS cnt FROM events WHERE session_id IN (#{placeholders}) GROUP BY session_id, window_id",
+            chunk
+          ).each do |row|
+            shapes[row["session_id"]][row["window_id"]] = row["cnt"]
+          end
+        end
+        shapes
+      end
+
+      def scan_summary(row, window_ids, event_count)
         summary_hash(
           session_id: row["session_id"],
-          window_ids: windows.keys,
-          event_count: windows.values.sum(&:size),
+          window_ids: window_ids,
+          event_count: event_count,
           created_at: row["created_at"],
           updated_at: row["updated_at"],
           first_event_at: row["first_event_at"],
