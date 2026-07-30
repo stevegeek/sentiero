@@ -116,6 +116,10 @@ module Sentiero
 
       # Batched scan: avoids the base's get_session + get_events-per-window N+1.
       SCAN_IN_CHUNK = 500
+      # Sessions whose events are materialized at once during a scan. Bounds
+      # peak memory: an unfiltered scan of N-hundred rrweb sessions would
+      # otherwise hold every parsed payload (GBs) before the first yield.
+      EVENT_LOAD_CHUNK = 25
 
       def each_session_events(limit: nil, since: nil, until_time: nil, types: nil)
         unless block_given?
@@ -126,22 +130,24 @@ module Sentiero
         rows = scan_session_rows(cap, since, until_time)
         return if rows.empty?
 
-        session_ids = rows.map { |row| row["session_id"] }
-        events = events_by_session_window(session_ids, types: types)
         # Summaries always describe the whole session (real event counts,
         # window list and true window start timestamps), so a typed scan
         # reports the same shape as a full one — including windows whose every
         # event was filtered out.
-        shapes = window_shapes(session_ids)
+        shapes = window_shapes(rows.map { |row| row["session_id"] })
 
-        rows.each do |row|
-          shape = shapes[row["session_id"]]
-          next unless shape
+        rows.each_slice(EVENT_LOAD_CHUNK) do |chunk|
+          events = events_by_session_window(chunk.map { |row| row["session_id"] }, types: types)
 
-          windows = events[row["session_id"]] || {}
-          starts = shape.transform_values { |stats| stats[:start] }
-          summary = scan_summary(row, shape.keys, shape.values.sum { |stats| stats[:count] }, starts)
-          shape.each_key { |window_id| yield summary, window_id, windows[window_id] || [] }
+          chunk.each do |row|
+            shape = shapes[row["session_id"]]
+            next unless shape
+
+            windows = events[row["session_id"]] || {}
+            starts = shape.transform_values { |stats| stats[:start] }
+            summary = scan_summary(row, shape.keys, shape.values.sum { |stats| stats[:count] }, starts)
+            shape.each_key { |window_id| yield summary, window_id, windows[window_id] || [] }
+          end
         end
       end
 
