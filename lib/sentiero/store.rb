@@ -28,6 +28,15 @@ module Sentiero
       @limits ||= Limits.new
     end
 
+    # True when event_type_counts / event_counts_by_day are computed without
+    # reading event payloads (native aggregates). StatsAggregator uses this to
+    # choose between one all-types scan (false) and a typed scan plus
+    # aggregate calls (true) — through the scan-based fallbacks the aggregates
+    # would each re-scan the store, which is slower than tallying inline.
+    def supports_event_aggregates?
+      false
+    end
+
     private
 
     def validate_id!(id)

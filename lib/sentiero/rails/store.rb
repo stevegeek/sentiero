@@ -55,7 +55,11 @@ module Sentiero
 
         events = events_by_session_window(summaries.map { |summary| summary[:session_id] })
         summaries.each do |summary|
-          (events[summary[:session_id]] || {}).each do |window_id, window_events|
+          windows = events[summary[:session_id]] || {}
+          summary = summary.merge(
+            window_starts: windows.transform_values { |window_events| window_events.first&.fetch("timestamp", nil) }
+          )
+          windows.each do |window_id, window_events|
             window_events = window_events.select { |event| types.include?(event["type"]) } if types
             yield summary, window_id, window_events
           end

@@ -590,6 +590,23 @@ module StoreContractTests
     assert_equal ["w1"], summaries.first[:window_ids]
   end
 
+  def test_each_session_events_summary_carries_true_window_starts
+    # The window opens with a snapshot; a typed scan that filters it out must
+    # still expose the window's real first timestamp — replay deep-link
+    # offsets (?t=) are computed against it.
+    @store.save_events(ref("s1", "w1"), [
+      make_event(timestamp: 1000.0, type: 2),
+      make_event(timestamp: 1500.0, type: 5, data: {"tag" => "navigation"})
+    ])
+
+    [nil, [5]].each do |types|
+      summaries = []
+      @store.each_session_events(types: types) { |session, _wid, _evts| summaries << session }
+
+      assert_equal({"w1" => 1000.0}, summaries.first[:window_starts], "types: #{types.inspect}")
+    end
+  end
+
   def test_event_type_counts_tallies_events_by_integer_type
     @store.save_events(ref("s1", "w1"), [
       make_event(timestamp: 1000.0, type: 2),
@@ -621,6 +638,31 @@ module StoreContractTests
 
     assert_nil counts[2]
     assert_equal 1, counts[5]
+  end
+
+  def test_event_counts_by_day_buckets_by_utc_day_of_event_timestamp
+    day1 = Time.utc(2026, 7, 29, 23, 59).to_f * 1000
+    day2 = Time.utc(2026, 7, 30, 0, 1).to_f * 1000
+    @store.save_events(ref("s1", "w1"), [
+      make_event(timestamp: day1, type: 3),
+      make_event(timestamp: day2, type: 3),
+      make_event(timestamp: day2 + 1000, type: 5)
+    ])
+
+    counts = @store.event_counts_by_day
+
+    assert_equal({"2026-07-29" => 1, "2026-07-30" => 2}, counts)
+  end
+
+  def test_event_counts_by_day_selects_sessions_by_window
+    @store.save_events(ref("s1", "w1"), [make_event(timestamp: Time.utc(2026, 7, 29).to_f * 1000, type: 3)])
+    sleep 0.05
+    boundary = Time.now.to_f
+    @store.save_events(ref("s2", "w1"), [make_event(timestamp: Time.utc(2026, 7, 30).to_f * 1000, type: 3)])
+
+    counts = @store.event_counts_by_day(since: boundary)
+
+    assert_equal({"2026-07-30" => 1}, counts)
   end
 
   def test_each_session_events_returns_enumerator_without_block

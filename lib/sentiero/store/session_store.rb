@@ -44,7 +44,10 @@ module Sentiero
       # `types:` (integer rrweb event types) narrows the yielded events arrays
       # — analytics scans use it to skip DOM-snapshot payloads they never read.
       # Summaries and the yielded window set are NOT narrowed: they always
-      # describe the whole session.
+      # describe the whole session, and carry :window_starts
+      # ({window_id => first event timestamp}) so replay deep-link offsets
+      # stay anchored to the window's true start even when the first event
+      # was filtered out.
       def each_session_events(limit: nil, since: nil, until_time: nil, types: nil)
         unless block_given?
           return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time, types: types)
@@ -58,6 +61,9 @@ module Sentiero
           next unless session
 
           windows = session[:windows] || []
+          summary = summary.merge(
+            window_starts: windows.to_h { |window| [window[:window_id], window[:first_event_at]] }
+          )
           windows.each do |window|
             window_id = window[:window_id]
             events = get_events(WindowRef.new(summary[:session_id], window_id))
@@ -78,6 +84,24 @@ module Sentiero
             type = event["type"]
             key = type.is_a?(Integer) ? type : nil
             counts[key] = (counts[key] || 0) + 1
+          end
+        end
+        counts
+      end
+
+      # {"YYYY-MM-DD" (UTC day of the event's ms timestamp) => count} across
+      # the sessions a scan with the same bounds would cover; events without a
+      # timestamp are skipped. Built on each_session_events so every backend
+      # gets it free; SQLite overrides with a payload-free aggregate.
+      def event_counts_by_day(limit: nil, since: nil, until_time: nil)
+        counts = {}
+        each_session_events(limit: limit, since: since, until_time: until_time) do |_summary, _window_id, events|
+          events.each do |event|
+            timestamp = event["timestamp"]
+            next unless timestamp.is_a?(Numeric)
+
+            day = Time.at(timestamp / 1000.0).utc.to_date.to_s
+            counts[day] = (counts[day] || 0) + 1
           end
         end
         counts

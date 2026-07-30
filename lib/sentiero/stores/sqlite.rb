@@ -61,6 +61,12 @@ module Sentiero
         Schema.create(db)
       end
 
+      # event_type_counts / event_counts_by_day group on indexed columns and
+      # never read payloads (see Schema for the column-order guarantee).
+      def supports_event_aggregates?
+        true
+      end
+
       def save_events(ref, events)
         return if events.nil? || events.empty?
 
@@ -122,25 +128,20 @@ module Sentiero
 
         session_ids = rows.map { |row| row["session_id"] }
         events = events_by_session_window(session_ids, types: types)
-        # Summaries always describe the whole session (real event counts and
-        # window list), so a typed scan reports the same shape as a full one —
-        # including windows whose every event was filtered out.
-        shapes = types ? window_shapes(session_ids) : nil
+        # Summaries always describe the whole session (real event counts,
+        # window list and true window start timestamps), so a typed scan
+        # reports the same shape as a full one — including windows whose every
+        # event was filtered out.
+        shapes = window_shapes(session_ids)
 
         rows.each do |row|
-          windows = events[row["session_id"]]
-          if types
-            shape = shapes[row["session_id"]]
-            next unless shape
+          shape = shapes[row["session_id"]]
+          next unless shape
 
-            summary = scan_summary(row, shape.keys, shape.values.sum)
-            shape.each_key { |window_id| yield summary, window_id, windows&.fetch(window_id, nil) || [] }
-          else
-            next unless windows
-
-            summary = scan_summary(row, windows.keys, windows.values.sum(&:size))
-            windows.each { |window_id, window_events| yield summary, window_id, window_events }
-          end
+          windows = events[row["session_id"]] || {}
+          starts = shape.transform_values { |stats| stats[:start] }
+          summary = scan_summary(row, shape.keys, shape.values.sum { |stats| stats[:count] }, starts)
+          shape.each_key { |window_id| yield summary, window_id, windows[window_id] || [] }
         end
       end
 
@@ -159,6 +160,28 @@ module Sentiero
           ).each do |row|
             key = row["type"]
             counts[key] = (counts[key] || 0) + row["cnt"]
+          end
+        end
+        counts
+      end
+
+      # Payload-free daily activity series: buckets on the indexed timestamp
+      # column ('unixepoch' takes seconds, timestamps are ms).
+      def event_counts_by_day(limit: nil, since: nil, until_time: nil)
+        cap = limit || limits.analytics_max_scan_sessions
+        session_ids = scan_session_rows(cap, since, until_time).map { |row| row["session_id"] }
+
+        counts = {}
+        session_ids.each_slice(SCAN_IN_CHUNK) do |chunk|
+          placeholders = (["?"] * chunk.size).join(",")
+          db.execute(
+            "SELECT strftime('%Y-%m-%d', timestamp / 1000, 'unixepoch') AS day, COUNT(*) AS cnt " \
+            "FROM events WHERE session_id IN (#{placeholders}) AND timestamp IS NOT NULL GROUP BY day",
+            chunk
+          ).each do |row|
+            next unless row["day"]
+
+            counts[row["day"]] = (counts[row["day"]] || 0) + row["cnt"]
           end
         end
         counts
@@ -542,24 +565,24 @@ module Sentiero
         grouped
       end
 
-      # {session_id => {window_id => event_count}} for the scanned sessions —
-      # index-only, so a typed scan can report full-session summaries without
-      # reading any payloads.
+      # {session_id => {window_id => {count:, start:}}} for the scanned
+      # sessions — index-only, so a typed scan can report full-session
+      # summaries and true window starts without reading any payloads.
       def window_shapes(session_ids)
         shapes = Hash.new { |h, sid| h[sid] = {} }
         session_ids.each_slice(SCAN_IN_CHUNK) do |chunk|
           placeholders = (["?"] * chunk.size).join(",")
           db.execute(
-            "SELECT session_id, window_id, COUNT(*) AS cnt FROM events WHERE session_id IN (#{placeholders}) GROUP BY session_id, window_id",
+            "SELECT session_id, window_id, COUNT(*) AS cnt, MIN(timestamp) AS min_ts FROM events WHERE session_id IN (#{placeholders}) GROUP BY session_id, window_id",
             chunk
           ).each do |row|
-            shapes[row["session_id"]][row["window_id"]] = row["cnt"]
+            shapes[row["session_id"]][row["window_id"]] = {count: row["cnt"], start: row["min_ts"]}
           end
         end
         shapes
       end
 
-      def scan_summary(row, window_ids, event_count)
+      def scan_summary(row, window_ids, event_count, window_starts)
         summary_hash(
           session_id: row["session_id"],
           window_ids: window_ids,
@@ -569,7 +592,7 @@ module Sentiero
           first_event_at: row["first_event_at"],
           last_event_at: row["last_event_at"],
           metadata: row["metadata"] && JSON.parse(row["metadata"])
-        )
+        ).merge(window_starts: window_starts)
       end
 
       def db

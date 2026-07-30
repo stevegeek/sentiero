@@ -20,7 +20,7 @@ module Sentiero
         clicks = ClickCollector.new
         representative = nil
 
-        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time) do |summary, window_id, events|
+        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time, types: [INCREMENTAL, META, CUSTOM]) do |summary, window_id, events|
           session_id = summary[:session_id]
 
           each_page_segment(events) do |url, segment, _anchor|
@@ -43,7 +43,7 @@ module Sentiero
       def build_heatmap_table(since: nil, until_time: nil)
         selectors_by_url = {}
 
-        scan_sessions(since: since, until_time: until_time) do |_summary, _window_id, events|
+        scan_sessions(since: since, until_time: until_time, types: [INCREMENTAL, META, CUSTOM]) do |_summary, _window_id, events|
           each_page_segment(events) do |url, segment, _anchor|
             next unless url
 
@@ -64,7 +64,7 @@ module Sentiero
       def recorded_urls
         urls = {}
 
-        scan_sessions do |_summary, _window_id, events|
+        scan_sessions(types: [INCREMENTAL, META, CUSTOM]) do |_summary, _window_id, events|
           each_page_segment(events) do |url, _segment, _anchor|
             urls[url] = true if url && (urls.key?(url) || urls.size < MAX_URLS)
           end

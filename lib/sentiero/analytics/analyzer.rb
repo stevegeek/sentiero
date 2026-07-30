@@ -27,10 +27,16 @@ module Sentiero
       # [sessions_scanned, hit_cap]. Counts DISTINCT sessions (not windows), so
       # `hit_cap` is correct even when a session spans several windows. Callers
       # build was_truncated as `collector.capped || hit_cap`.
-      def scan_sessions(limit: nil, since: nil, until_time: nil)
+      # Every analyzer passes types: — the integer rrweb event types it
+      # actually reads — so the store can skip fetching and parsing the rest
+      # (above all type-2 DOM snapshots, which dominate stored bytes). Always
+      # include META: each_page_segment and entry attribution anchor on it, and
+      # in rrweb it precedes the snapshot, keeping window-start anchors stable
+      # under filtering. Pass nil only to read genuinely every event.
+      def scan_sessions(limit: nil, since: nil, until_time: nil, types: nil)
         scan_cap = limit || store.limits.analytics_max_scan_sessions
         seen = {}
-        store.each_session_events(limit: scan_cap, since: since, until_time: until_time) do |summary, window_id, events|
+        store.each_session_events(limit: scan_cap, since: since, until_time: until_time, types: types) do |summary, window_id, events|
           seen[summary[:session_id]] = true
           yield summary, window_id, events
         end
@@ -54,10 +60,10 @@ module Sentiero
       # anchor_ts]; consecutive same-href Metas (same-URL reloads) stay in one
       # segment. anchor_ts is the WINDOW's first timestamp for every segment:
       # replay deep-links (?t=offset) are window-relative, never segment-local.
-      def each_page_segment(events)
+      def each_page_segment(events, anchor: nil)
         return if events.empty?
 
-        anchor_ts = events.first&.fetch("timestamp", nil)
+        anchor_ts = anchor || events.first&.fetch("timestamp", nil)
 
         boundaries = [] # [start_index, url] per href change
         events.each_with_index do |event, index|
@@ -77,6 +83,15 @@ module Sentiero
           stop = boundaries[i + 1]&.first || events.size
           yield url, events[start...stop], anchor_ts
         end
+      end
+
+      # The window's true first timestamp — the replay deep-link (?t=offset)
+      # anchor. Typed scans may have filtered the window's real first event
+      # out of `events`, so prefer the summary's :window_starts and fall back
+      # to events.first only for stores that don't provide it.
+      def window_anchor(summary, window_id, events)
+        anchor = summary[:window_starts]&.fetch(window_id, nil)
+        anchor.nil? ? events.first&.fetch("timestamp", nil) : anchor
       end
 
       def meta_href(event)
