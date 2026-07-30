@@ -40,6 +40,26 @@ module Sentiero
         assert_operator statements, :<=, 3, "each_session_events should be batched, saw #{statements} queries"
       end
 
+      # The perf point of the types: filter — DOM snapshots (type 2) dominate
+      # the stored bytes, and a typed scan must skip them in SQL, never
+      # fetching or parsing their payloads. Corrupting the snapshot's stored
+      # JSON makes any read of it fail loudly, so success proves the pushdown.
+      def test_typed_scan_never_reads_filtered_payloads
+        @store.save_events(Sentiero::WindowRef.new("s1", "w1"), [
+          {"timestamp" => 1.0, "type" => 2, "data" => {"node" => {}}},
+          {"timestamp" => 2.0, "type" => 5, "data" => {"tag" => "navigation"}}
+        ])
+        @store.send(:db).execute("UPDATE events SET data = '{corrupt' WHERE type = 2")
+
+        captured = nil
+        @store.each_session_events(types: [4, 5]) { |_s, _w, evts| captured = evts }
+        assert_equal [5], captured.map { |event| event["type"] }
+
+        assert_raises(JSON::ParserError) do
+          @store.each_session_events { |_s, _w, _e| }
+        end
+      end
+
       private
 
       def count_statements

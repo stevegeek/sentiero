@@ -40,8 +40,15 @@ module Sentiero
       # Yields [session_summary_hash, window_id, events_array] per window, newest
       # sessions first, capped at `limit`. Built from list_sessions/get_session/
       # get_events so every backend gets it free; stores may override.
-      def each_session_events(limit: nil, since: nil, until_time: nil)
-        return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time) unless block_given?
+      #
+      # `types:` (integer rrweb event types) narrows the yielded events arrays
+      # — analytics scans use it to skip DOM-snapshot payloads they never read.
+      # Summaries and the yielded window set are NOT narrowed: they always
+      # describe the whole session.
+      def each_session_events(limit: nil, since: nil, until_time: nil, types: nil)
+        unless block_given?
+          return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time, types: types)
+        end
 
         cap = limit || limits.analytics_max_scan_sessions
         sessions = list_sessions(limit: cap, since: since, until_time: until_time)
@@ -54,6 +61,7 @@ module Sentiero
           windows.each do |window|
             window_id = window[:window_id]
             events = get_events(WindowRef.new(summary[:session_id], window_id))
+            events = events.select { |event| types.include?(event["type"]) } if types
             yield summary, window_id, events
           end
         end
