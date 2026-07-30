@@ -144,6 +144,26 @@ module Sentiero
         end
       end
 
+      # Index-assisted aggregate: groups on the type column without ever
+      # reading a payload, unlike the base's parse-everything fallback.
+      def event_type_counts(limit: nil, since: nil, until_time: nil)
+        cap = limit || limits.analytics_max_scan_sessions
+        session_ids = scan_session_rows(cap, since, until_time).map { |row| row["session_id"] }
+
+        counts = {}
+        session_ids.each_slice(SCAN_IN_CHUNK) do |chunk|
+          placeholders = (["?"] * chunk.size).join(",")
+          db.execute(
+            "SELECT type, COUNT(*) AS cnt FROM events WHERE session_id IN (#{placeholders}) GROUP BY type",
+            chunk
+          ).each do |row|
+            key = row["type"]
+            counts[key] = (counts[key] || 0) + row["cnt"]
+          end
+        end
+        counts
+      end
+
       def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil)
         where = Where.new
         where.add("s.updated_at >= ?", since.to_f) if since

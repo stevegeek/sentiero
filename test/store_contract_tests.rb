@@ -590,6 +590,39 @@ module StoreContractTests
     assert_equal ["w1"], summaries.first[:window_ids]
   end
 
+  def test_event_type_counts_tallies_events_by_integer_type
+    @store.save_events(ref("s1", "w1"), [
+      make_event(timestamp: 1000.0, type: 2),
+      make_event(timestamp: 1001.0, type: 3),
+      make_event(timestamp: 1002.0, type: 3),
+      make_event(timestamp: 1003.0, type: 5)
+    ])
+    @store.save_events(ref("s2", "w1"), [
+      make_event(timestamp: 2000.0, type: 3),
+      make_event(timestamp: 2001.0, type: "mouse")
+    ])
+
+    counts = @store.event_type_counts
+
+    assert_equal 1, counts[2]
+    assert_equal 3, counts[3]
+    assert_equal 1, counts[5]
+    # Non-integer client-supplied types tally under nil, never as a real type.
+    assert_equal 1, counts[nil]
+  end
+
+  def test_event_type_counts_respects_the_time_window
+    @store.save_events(ref("s1", "w1"), [make_event(timestamp: 1000.0, type: 2)])
+    sleep 0.05
+    boundary = Time.now.to_f
+    @store.save_events(ref("s2", "w1"), [make_event(timestamp: 2000.0, type: 5)])
+
+    counts = @store.event_type_counts(since: boundary)
+
+    assert_nil counts[2]
+    assert_equal 1, counts[5]
+  end
+
   def test_each_session_events_returns_enumerator_without_block
     @store.save_events(ref("s1", "w1"), [make_event(timestamp: 1.0)])
 

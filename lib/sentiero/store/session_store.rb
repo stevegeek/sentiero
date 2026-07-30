@@ -67,6 +67,22 @@ module Sentiero
         end
       end
 
+      # {integer_type => count} across the sessions a scan with the same
+      # bounds would cover; events with a non-integer "type" tally under nil.
+      # Absent types have no key. Built on each_session_events so every
+      # backend gets it free; SQLite overrides with a payload-free aggregate.
+      def event_type_counts(limit: nil, since: nil, until_time: nil)
+        counts = {}
+        each_session_events(limit: limit, since: since, until_time: until_time) do |_summary, _window_id, events|
+          events.each do |event|
+            type = event["type"]
+            key = type.is_a?(Integer) ? type : nil
+            counts[key] = (counts[key] || 0) + 1
+          end
+        end
+        counts
+      end
+
       # Deletes every session whose updated_at is older than `seconds` ago,
       # returning the count. Built from list_sessions + delete_session so every
       # backend gets it free; stores may override with a direct query.
