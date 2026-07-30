@@ -69,6 +69,37 @@ module Sentiero
         end
       end
 
+      # Dashboard analytics scans hold the store for seconds on big databases.
+      # Recorder beacons (EventsApp POSTs) must not queue behind them: a
+      # save_events issued while a scan's consumer is mid-yield has to complete
+      # promptly, not after the whole scan finishes.
+      def test_save_events_is_not_blocked_by_a_slow_scan
+        store = Sentiero::Stores::SQLite.new(path: @db_path)
+        3.times do |i|
+          store.save_events(Sentiero::WindowRef.new("session-#{i}", "w1"),
+            [{"timestamp" => (i + 1).to_f, "type" => 3}])
+        end
+
+        scan_started = Queue.new
+        scanner = Thread.new do
+          store.each_session_events do |_summary, _wid, _events|
+            scan_started << true
+            sleep 0.3
+          end
+        end
+
+        scan_started.pop
+        started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+        store.save_events(Sentiero::WindowRef.new("write-during-scan", "w1"),
+          [{"timestamp" => 99.0, "type" => 3}])
+        elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+        assert_operator elapsed, :<, 0.25,
+          "save_events waited #{elapsed.round(3)}s behind an in-progress scan"
+      ensure
+        scanner&.join
+      end
+
       private
 
       def collect_errors(threads: 3)

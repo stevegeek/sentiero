@@ -43,7 +43,9 @@ module Sentiero
       private
 
       def count_statements
-        db = @store.instance_variable_get(:@db)
+        # The store's connection is per-thread; the scan below runs on this
+        # thread, so tracing this thread's connection sees all its statements.
+        db = @store.send(:db)
         count = 0
         db.trace { |_sql| count += 1 }
         yield
