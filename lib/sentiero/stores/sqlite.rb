@@ -50,9 +50,15 @@ module Sentiero
 
         @limits = limits
         @monitor = Monitor.new
-        @path = path
-        @db = create_database
-        Schema.create(@db)
+        @path = path.to_s
+        # In-memory databases are private to one connection, so they keep the
+        # single shared connection serialized by @monitor. File-backed stores
+        # get one connection per thread: WAL readers never block the writer, so
+        # a slow dashboard scan can't stall recorder ingest (and vice versa).
+        @in_memory = @path == ":memory:" || @path.start_with?("file::memory:")
+        @tls_key = :"sentiero_sqlite_#{object_id}"
+        @shared_db = create_connection if @in_memory
+        Schema.create(db)
       end
 
       def save_events(ref, events)
@@ -66,25 +72,25 @@ module Sentiero
         batch_min = event_timestamps.min
         batch_max = event_timestamps.max
 
-        @db.transaction do
-          existing = @db.get_first_row("SELECT id, first_event_at, last_event_at FROM sessions WHERE session_id = ?", [session_id])
+        db.transaction(:immediate) do
+          existing = db.get_first_row("SELECT id, first_event_at, last_event_at FROM sessions WHERE session_id = ?", [session_id])
 
           if existing
             new_first = batch_min ? [existing["first_event_at"], batch_min].compact.min : existing["first_event_at"]
             new_last = batch_max ? [existing["last_event_at"], batch_max].compact.max : existing["last_event_at"]
 
-            @db.execute(
+            db.execute(
               "UPDATE sessions SET updated_at = ?, first_event_at = ?, last_event_at = ? WHERE session_id = ?",
               [now, new_first, new_last, session_id]
             )
           else
-            @db.execute(
+            db.execute(
               "INSERT INTO sessions (session_id, created_at, updated_at, first_event_at, last_event_at, metadata) VALUES (?, ?, ?, ?, ?, NULL)",
               [session_id, now, now, batch_min, batch_max]
             )
           end
 
-          stmt = @db.prepare("INSERT INTO events (session_id, window_id, timestamp, data) VALUES (?, ?, ?, ?)")
+          stmt = db.prepare("INSERT INTO events (session_id, window_id, timestamp, data) VALUES (?, ?, ?, ?)")
           begin
             events.each do |event|
               stmt.execute(session_id, window_id, event["timestamp"]&.to_f, JSON.generate(event))
@@ -149,10 +155,10 @@ module Sentiero
           LIMIT ? OFFSET ?
         SQL
 
-        rows = @db.execute(sql, where.params + [limit, offset])
+        rows = db.execute(sql, where.params + [limit, offset])
 
         rows.map { |row|
-          window_ids = @db.execute(
+          window_ids = db.execute(
             "SELECT DISTINCT window_id FROM events WHERE session_id = ?", [row["session_id"]]
           ).map { |window_row| window_row["window_id"] }
 
@@ -172,10 +178,10 @@ module Sentiero
       def get_session(session_id)
         validate_id!(session_id)
 
-        row = @db.get_first_row("SELECT * FROM sessions WHERE session_id = ?", [session_id])
+        row = db.get_first_row("SELECT * FROM sessions WHERE session_id = ?", [session_id])
         return nil unless row
 
-        window_stats = @db.execute(
+        window_stats = db.execute(
           "SELECT window_id, COUNT(*) AS cnt, MIN(timestamp) AS min_ts, MAX(timestamp) AS max_ts FROM events WHERE session_id = ? GROUP BY window_id",
           [session_id]
         )
@@ -222,7 +228,7 @@ module Sentiero
           params << limit.to_i
         end
 
-        @db.execute(sql, params).map { |event_row| JSON.parse(event_row["data"]) }
+        db.execute(sql, params).map { |event_row| JSON.parse(event_row["data"]) }
       end
 
       def save_metadata(session_id, metadata)
@@ -231,13 +237,13 @@ module Sentiero
         validate_id!(session_id)
         validate_metadata!(metadata)
 
-        @db.transaction do
-          row = @db.get_first_row("SELECT metadata FROM sessions WHERE session_id = ?", [session_id])
+        db.transaction(:immediate) do
+          row = db.get_first_row("SELECT metadata FROM sessions WHERE session_id = ?", [session_id])
           return unless row
 
           existing = row["metadata"] ? JSON.parse(row["metadata"]) : {}
           merged = existing.merge(metadata.transform_keys(&:to_s))
-          @db.execute("UPDATE sessions SET metadata = ? WHERE session_id = ?", [JSON.generate(merged), session_id])
+          db.execute("UPDATE sessions SET metadata = ? WHERE session_id = ?", [JSON.generate(merged), session_id])
         end
         nil
       end
@@ -245,11 +251,11 @@ module Sentiero
       def delete_session(session_id)
         validate_id!(session_id)
 
-        @db.transaction do
-          @db.execute("DELETE FROM events WHERE session_id = ?", [session_id])
-          @db.execute("DELETE FROM sessions WHERE session_id = ?", [session_id])
-          @db.execute("DELETE FROM occurrences WHERE session_id = ?", [session_id])
-          @db.execute("DELETE FROM server_events WHERE session_id = ?", [session_id])
+        db.transaction(:immediate) do
+          db.execute("DELETE FROM events WHERE session_id = ?", [session_id])
+          db.execute("DELETE FROM sessions WHERE session_id = ?", [session_id])
+          db.execute("DELETE FROM occurrences WHERE session_id = ?", [session_id])
+          db.execute("DELETE FROM server_events WHERE session_id = ?", [session_id])
         end
         nil
       end
@@ -258,12 +264,12 @@ module Sentiero
         validate_window_ref!(ref)
         session_id, window_id = ref.session_id, ref.window_id
 
-        @db.transaction do
-          @db.execute("DELETE FROM events WHERE session_id = ? AND window_id = ?", [session_id, window_id])
+        db.transaction(:immediate) do
+          db.execute("DELETE FROM events WHERE session_id = ? AND window_id = ?", [session_id, window_id])
 
-          remaining = @db.get_first_value("SELECT COUNT(*) FROM events WHERE session_id = ?", [session_id])
+          remaining = db.get_first_value("SELECT COUNT(*) FROM events WHERE session_id = ?", [session_id])
           if remaining == 0
-            @db.execute("DELETE FROM sessions WHERE session_id = ?", [session_id])
+            db.execute("DELETE FROM sessions WHERE session_id = ?", [session_id])
           end
         end
         nil
@@ -277,26 +283,26 @@ module Sentiero
         stored = occurrence.merge("id" => occ_id)
 
         # Native-SQL upsert mirroring the base new_problem_attrs/touched_problem_attrs.
-        @db.transaction do
-          existing = @db.get_first_row(
+        db.transaction(:immediate) do
+          existing = db.get_first_row(
             "SELECT count, first_seen, last_seen, status, resolved_at FROM problems WHERE fingerprint = ?", [fp]
           )
           if existing
             reopening = existing["status"] == "resolved"
-            @db.execute(
+            db.execute(
               "UPDATE problems SET count = count + 1, first_seen = ?, last_seen = ?, message = ?, status = ?, resolved_at = ? WHERE fingerprint = ?",
               [[existing["first_seen"], ts].min, [existing["last_seen"], ts].max, occurrence["message"],
                 reopening ? "open" : existing["status"], reopening ? nil : existing["resolved_at"], fp]
             )
           else
-            @db.execute(
+            db.execute(
               "INSERT INTO problems (fingerprint, project, exception_class, title, message, count, status, first_seen, last_seen, resolved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)",
               [fp, occurrence["project"], occurrence["exception_class"], build_problem_title(occurrence),
                 occurrence["message"], 1, "open", ts, ts]
             )
           end
 
-          @db.execute(
+          db.execute(
             "INSERT INTO occurrences (occurrence_id, fingerprint, session_id, timestamp, data) VALUES (?, ?, ?, ?, ?)",
             [occ_id, fp, occurrence["session_id"], ts, JSON.generate(stored)]
           )
@@ -323,13 +329,13 @@ module Sentiero
         when "count" then "ORDER BY count DESC"
         else "ORDER BY last_seen DESC"
         end
-        @db.execute("SELECT * FROM problems #{where.clause} #{order} LIMIT ? OFFSET ?", where.params + [limit, offset])
+        db.execute("SELECT * FROM problems #{where.clause} #{order} LIMIT ? OFFSET ?", where.params + [limit, offset])
           .map { |row| problem_row_to_hash(row) }
       end
 
       def get_problem(problem_id)
         validate_id!(problem_id)
-        row = @db.get_first_row("SELECT * FROM problems WHERE fingerprint = ?", [problem_id])
+        row = db.get_first_row("SELECT * FROM problems WHERE fingerprint = ?", [problem_id])
         row && problem_row_to_hash(row)
       end
 
@@ -343,7 +349,7 @@ module Sentiero
           sql += " LIMIT ?"
           params += [limit.to_i]
         end
-        @db.execute(sql, params).map { |row| JSON.parse(row["data"]) }
+        db.execute(sql, params).map { |row| JSON.parse(row["data"]) }
       end
 
       # COUNT(*) on the (fingerprint, timestamp) index, no row materialization.
@@ -351,14 +357,14 @@ module Sentiero
         validate_id!(problem_id)
         where = Where.new.add("fingerprint = ?", problem_id)
         where.add("timestamp > ?", after.to_f) if after
-        @db.get_first_value("SELECT COUNT(*) FROM occurrences #{where.clause}", where.params)
+        db.get_first_value("SELECT COUNT(*) FROM occurrences #{where.clause}", where.params)
       end
 
       def update_problem_status(problem_id, status)
         validate_id!(problem_id)
         validate_status!(status)
         resolved_at = (status == "resolved") ? Time.now.to_f : nil
-        @db.execute("UPDATE problems SET status = ?, resolved_at = ? WHERE fingerprint = ?", [status, resolved_at, problem_id])
+        db.execute("UPDATE problems SET status = ?, resolved_at = ? WHERE fingerprint = ?", [status, resolved_at, problem_id])
         nil
       end
 
@@ -366,8 +372,8 @@ module Sentiero
         validate_server_event!(event)
         ev_id = SecureRandom.uuid
         stored = event.merge("id" => ev_id)
-        @db.transaction do
-          @db.execute(
+        db.transaction(:immediate) do
+          db.execute(
             "INSERT INTO server_events (event_id, project, name, level, session_id, timestamp, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
             [ev_id, event["project"], event["name"], event["level"], event["session_id"], event["timestamp"].to_f, JSON.generate(stored)]
           )
@@ -378,7 +384,7 @@ module Sentiero
 
       def get_server_event(event_id)
         validate_id!(event_id)
-        row = @db.get_first_row("SELECT data FROM server_events WHERE event_id = ?", [event_id])
+        row = db.get_first_row("SELECT data FROM server_events WHERE event_id = ?", [event_id])
         row && JSON.parse(row["data"])
       end
 
@@ -389,7 +395,7 @@ module Sentiero
         where.add("level = ?", level) if level
         where.add("session_id = ?", session_id) if session_id
         where.add("timestamp > ?", after.to_f) if after
-        @db.execute("SELECT data FROM server_events #{where.clause} ORDER BY timestamp ASC LIMIT ?", where.params + [limit])
+        db.execute("SELECT data FROM server_events #{where.clause} ORDER BY timestamp ASC LIMIT ?", where.params + [limit])
           .map { |row| JSON.parse(row["data"]) }
       end
 
@@ -401,7 +407,7 @@ module Sentiero
           sql += " LIMIT ?"
           params << limit.to_i
         end
-        @db.execute(sql, params).map { |row| JSON.parse(row["data"]) }
+        db.execute(sql, params).map { |row| JSON.parse(row["data"]) }
       end
 
       def server_events_for_session(session_id, limit: nil)
@@ -412,7 +418,7 @@ module Sentiero
           sql += " LIMIT ?"
           params << limit.to_i
         end
-        @db.execute(sql, params).map { |row| JSON.parse(row["data"]) }
+        db.execute(sql, params).map { |row| JSON.parse(row["data"]) }
       end
 
       def session_ids_for_problem(problem_id, limit: nil)
@@ -423,16 +429,16 @@ module Sentiero
           sql += " LIMIT ?"
           params << limit.to_i
         end
-        @db.execute(sql, params).map { |row| row["session_id"] }
+        db.execute(sql, params).map { |row| row["session_id"] }
       end
 
       def clear!
-        @db.transaction do
-          @db.execute("DELETE FROM events")
-          @db.execute("DELETE FROM sessions")
-          @db.execute("DELETE FROM problems")
-          @db.execute("DELETE FROM occurrences")
-          @db.execute("DELETE FROM server_events")
+        db.transaction(:immediate) do
+          db.execute("DELETE FROM events")
+          db.execute("DELETE FROM sessions")
+          db.execute("DELETE FROM problems")
+          db.execute("DELETE FROM occurrences")
+          db.execute("DELETE FROM server_events")
         end
         nil
       end
@@ -441,21 +447,21 @@ module Sentiero
         cutoff = Time.now.to_f - seconds
         session_count = nil
 
-        @db.transaction do
-          @db.execute(
+        db.transaction(:immediate) do
+          db.execute(
             "DELETE FROM events WHERE session_id IN (SELECT session_id FROM sessions WHERE updated_at < ?)",
             [cutoff]
           )
-          @db.execute("DELETE FROM sessions WHERE updated_at < ?", [cutoff])
-          session_count = @db.changes
+          db.execute("DELETE FROM sessions WHERE updated_at < ?", [cutoff])
+          session_count = db.changes
 
-          @db.execute("DELETE FROM server_events WHERE timestamp < ?", [cutoff])
-          @db.execute("DELETE FROM occurrences WHERE timestamp < ?", [cutoff])
-          @db.execute(
+          db.execute("DELETE FROM server_events WHERE timestamp < ?", [cutoff])
+          db.execute("DELETE FROM occurrences WHERE timestamp < ?", [cutoff])
+          db.execute(
             "DELETE FROM occurrences WHERE fingerprint IN (SELECT fingerprint FROM problems WHERE last_seen < ?)",
             [cutoff]
           )
-          @db.execute("DELETE FROM problems WHERE last_seen < ?", [cutoff])
+          db.execute("DELETE FROM problems WHERE last_seen < ?", [cutoff])
         end
 
         session_count
@@ -471,7 +477,7 @@ module Sentiero
         where = Where.new
         where.add("updated_at >= ?", since.to_f) if since
         where.add("updated_at <= ?", until_time.to_f) if until_time
-        @db.execute(
+        db.execute(
           "SELECT session_id, created_at, updated_at, first_event_at, last_event_at, metadata " \
           "FROM sessions #{where.clause} ORDER BY updated_at DESC LIMIT ?", where.params + [cap]
         )
@@ -481,7 +487,7 @@ module Sentiero
         grouped = Hash.new { |h, sid| h[sid] = {} }
         session_ids.each_slice(SCAN_IN_CHUNK) do |chunk|
           placeholders = (["?"] * chunk.size).join(",")
-          @db.execute(
+          db.execute(
             "SELECT session_id, window_id, data FROM events WHERE session_id IN (#{placeholders}) ORDER BY timestamp ASC",
             chunk
           ).each do |row|
@@ -504,23 +510,33 @@ module Sentiero
         )
       end
 
-      def create_database
-        db = ::SQLite3::Database.new(@path)
-        db.results_as_hash = true
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA foreign_keys=ON")
-        db
+      def db
+        return @shared_db if @in_memory
+
+        Thread.current[@tls_key] ||= create_connection
+      end
+
+      def create_connection
+        conn = ::SQLite3::Database.new(@path)
+        conn.results_as_hash = true
+        # busy_handler_timeout (not busy_timeout): releases the GVL between
+        # retries, so a thread waiting on another connection's write lock can't
+        # starve the very thread that must finish to release it.
+        conn.busy_handler_timeout = 5_000
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn
       end
 
       def enforce_max_events(session_id)
         max_events = limits.max_events_per_session
         return unless max_events
 
-        total = @db.get_first_value("SELECT COUNT(*) FROM events WHERE session_id = ?", [session_id])
+        total = db.get_first_value("SELECT COUNT(*) FROM events WHERE session_id = ?", [session_id])
         return unless total > max_events
 
         excess = total - max_events
-        @db.execute(
+        db.execute(
           "DELETE FROM events WHERE id IN (SELECT id FROM events WHERE session_id = ? ORDER BY timestamp ASC LIMIT ?)",
           [session_id, excess]
         )
@@ -530,18 +546,18 @@ module Sentiero
         max_sessions = limits.max_sessions
         return unless max_sessions
 
-        total = @db.get_first_value("SELECT COUNT(*) FROM sessions")
+        total = db.get_first_value("SELECT COUNT(*) FROM sessions")
         return unless total > max_sessions
 
         to_evict = total - max_sessions
-        oldest = @db.execute(
+        oldest = db.execute(
           "SELECT session_id FROM sessions WHERE session_id != ? ORDER BY updated_at ASC LIMIT ?",
           [protected_session_id, to_evict]
         ).map { |session_row| session_row["session_id"] }
 
         oldest.each do |sid|
-          @db.execute("DELETE FROM events WHERE session_id = ?", [sid])
-          @db.execute("DELETE FROM sessions WHERE session_id = ?", [sid])
+          db.execute("DELETE FROM events WHERE session_id = ?", [sid])
+          db.execute("DELETE FROM sessions WHERE session_id = ?", [sid])
         end
       end
 
@@ -566,14 +582,14 @@ module Sentiero
         max = limits.max_problems
         return unless max
 
-        total = @db.get_first_value("SELECT COUNT(*) FROM problems")
+        total = db.get_first_value("SELECT COUNT(*) FROM problems")
         return unless total > max
 
         excess = total - max
-        fps = @db.execute("SELECT fingerprint FROM problems ORDER BY last_seen ASC LIMIT ?", [excess]).map { |r| r["fingerprint"] }
+        fps = db.execute("SELECT fingerprint FROM problems ORDER BY last_seen ASC LIMIT ?", [excess]).map { |r| r["fingerprint"] }
         fps.each do |fp|
-          @db.execute("DELETE FROM occurrences WHERE fingerprint = ?", [fp])
-          @db.execute("DELETE FROM problems WHERE fingerprint = ?", [fp])
+          db.execute("DELETE FROM occurrences WHERE fingerprint = ?", [fp])
+          db.execute("DELETE FROM problems WHERE fingerprint = ?", [fp])
         end
       end
 
@@ -581,11 +597,11 @@ module Sentiero
         max = limits.max_server_events
         return unless max
 
-        total = @db.get_first_value("SELECT COUNT(*) FROM server_events")
+        total = db.get_first_value("SELECT COUNT(*) FROM server_events")
         return unless total > max
 
         excess = total - max
-        @db.execute("DELETE FROM server_events WHERE id IN (SELECT id FROM server_events ORDER BY timestamp ASC LIMIT ?)", [excess])
+        db.execute("DELETE FROM server_events WHERE id IN (SELECT id FROM server_events ORDER BY timestamp ASC LIMIT ?)", [excess])
       end
 
       # Rack hands URL path segments over as ASCII-8BIT strings, and sqlite3
@@ -605,19 +621,25 @@ module Sentiero
         end
       end
 
-      # One shared SQLite3 connection can't be driven from multiple threads at once
-      # (concurrent statements race on its single transaction state), and EventsApp
-      # is a concurrent caller under Puma. Serialize every public op through one
-      # reentrant Monitor: reentrant for internal calls (save_occurrence ->
-      # save_metadata), wrap-all so new methods stay covered, defined last to see them.
-      # The same wrapper applies utf8_arg to every argument (see above).
+      # File-backed stores rely on per-thread connections (see #db) for thread
+      # safety — WAL lets the scan's reader run beside a writer, so no global
+      # lock is needed and a slow dashboard scan can't stall recorder ingest.
+      # In-memory stores share one connection, so those DO serialize every
+      # public op through the reentrant @monitor (reentrant for internal calls
+      # like save_occurrence -> save_metadata). Wrap-all so new methods stay
+      # covered; defined last to see them. The same wrapper applies utf8_arg
+      # to every argument (see above).
       synchronized = public_instance_methods(false)
       prepend(Module.new do
         synchronized.each do |method_name|
           define_method(method_name) do |*args, **kwargs, &block|
             args = args.map { |arg| utf8_arg.call(arg) }
             kwargs = kwargs.transform_values { |value| utf8_arg.call(value) }
-            @monitor.synchronize { super(*args, **kwargs, &block) }
+            if @in_memory
+              @monitor.synchronize { super(*args, **kwargs, &block) }
+            else
+              super(*args, **kwargs, &block)
+            end
           end
         end
       end)
