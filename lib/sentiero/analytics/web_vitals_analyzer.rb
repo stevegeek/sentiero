@@ -25,8 +25,8 @@ module Sentiero
         pages = {} # url => VitalsCollector
         accumulation_capped = false
 
-        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time) do |summary, window_id, events|
-          each_page_segment(events) do |url, segment, anchor|
+        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time, types: [META, CUSTOM]) do |summary, window_id, events|
+          each_page_segment(events, anchor: window_anchor(summary, window_id, events)) do |url, segment, anchor|
             next unless url
 
             collector = collector_for(pages, url)

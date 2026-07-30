@@ -49,7 +49,7 @@ module Sentiero
       def analyze(limit: nil, since: nil, until_time: nil)
         accumulators = {}
 
-        scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time) do |summary, window_id, events|
+        scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time, types: [INCREMENTAL, META, CUSTOM]) do |summary, window_id, events|
           session_id = summary[:session_id]
           acc = (accumulators[session_id] ||= new_accumulator(summary, window_id))
           accumulate_window(acc, events)

@@ -35,7 +35,7 @@ module Sentiero
       def analyze(target_url, limit: nil, since: nil, until_time: nil)
         acc = new_accumulator
 
-        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time) do |summary, window_id, events|
+        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time, types: [INCREMENTAL, META, CUSTOM]) do |summary, window_id, events|
           session_id = summary[:session_id]
 
           # Detect over the FULL window: frustration semantics span page
@@ -48,7 +48,7 @@ module Sentiero
           first_was_target = false
           target_segments = 0
 
-          each_page_segment(events) do |url, segment, anchor|
+          each_page_segment(events, anchor: window_anchor(summary, window_id, events)) do |url, segment, anchor|
             matches = url == target_url
             first_was_target = true if segment_index.zero? && matches
             last_index = segment_index if matches

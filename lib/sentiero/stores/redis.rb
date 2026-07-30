@@ -116,6 +116,9 @@ module Sentiero
 
           windows = window_ids.to_h { |wid| [wid, parse_events(event_futures[[sid, wid]].value)] }
           summary = scan_summary(sid, meta, window_ids, windows.values.sum(&:size))
+          summary = summary.merge(
+            window_starts: windows.transform_values { |events| events.first&.fetch("timestamp", nil) }
+          )
           windows.each do |wid, events|
             events = events.select { |event| types.include?(event["type"]) } if types
             yield summary, wid, events

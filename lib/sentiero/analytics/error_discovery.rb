@@ -19,7 +19,7 @@ module Sentiero
       def grouped_errors(sort_by: "count", since: nil, until_time: nil)
         groups = {}
 
-        _scanned, hit_cap = scan_sessions(since: since, until_time: until_time) do |summary, window_id, events|
+        _scanned, hit_cap = scan_sessions(since: since, until_time: until_time, types: [META, CUSTOM]) do |summary, window_id, events|
           collect_window(groups, summary, window_id, events)
         end
 
@@ -32,7 +32,7 @@ module Sentiero
       private
 
       def collect_window(groups, summary, window_id, events)
-        anchor = events.first&.fetch("timestamp", nil)
+        anchor = window_anchor(summary, window_id, events)
 
         events.each do |event|
           next unless ErrorCollector.error_event?(event)
