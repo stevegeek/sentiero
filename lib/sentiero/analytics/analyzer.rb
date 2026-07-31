@@ -27,12 +27,10 @@ module Sentiero
       # [sessions_scanned, hit_cap]. Counts DISTINCT sessions (not windows), so
       # `hit_cap` is correct even when a session spans several windows. Callers
       # build was_truncated as `collector.capped || hit_cap`.
-      # Every analyzer passes types: — the integer rrweb event types it
-      # actually reads — so the store can skip fetching and parsing the rest
-      # (above all type-2 DOM snapshots, which dominate stored bytes). Always
-      # include META: each_page_segment and entry attribution anchor on it, and
-      # in rrweb it precedes the snapshot, keeping window-start anchors stable
-      # under filtering. Pass nil only to read genuinely every event.
+      # types: lets the store skip fetching/parsing event types the analyzer
+      # never reads (above all type-2 DOM snapshots, which dominate stored
+      # bytes). Always include META — page segmentation and entry attribution
+      # anchor on it.
       def scan_sessions(limit: nil, since: nil, until_time: nil, types: nil)
         scan_cap = limit || store.limits.analytics_max_scan_sessions
         seen = {}
@@ -85,10 +83,9 @@ module Sentiero
         end
       end
 
-      # The window's true first timestamp — the replay deep-link (?t=offset)
-      # anchor. Typed scans may have filtered the window's real first event
-      # out of `events`, so prefer the summary's :window_starts and fall back
-      # to events.first only for stores that don't provide it.
+      # Replay ?t= offsets anchor on the window's TRUE first timestamp, which
+      # a typed scan may have filtered out of `events` — prefer the summary's
+      # :window_starts over events.first.
       def window_anchor(summary, window_id, events)
         anchor = summary[:window_starts]&.fetch(window_id, nil)
         anchor.nil? ? events.first&.fetch("timestamp", nil) : anchor

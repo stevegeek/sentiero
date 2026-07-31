@@ -18,14 +18,10 @@ module Sentiero
 
       NAVIGATION_TAG = "navigation"
 
-      # When the store supports payload-free aggregates (SQLite), the scan
-      # only reads Meta (entry attribution, day anchors) and Custom (tags,
-      # errors) events; the type histogram, total event count and the per-day
-      # activity series come from the store's aggregates in #finalize, so
-      # snapshot/incremental payloads are never fetched or parsed. Stores
-      # without native aggregates keep the original single all-types scan —
-      # through the scan-based aggregate fallbacks those figures would each
-      # re-scan the store.
+      # With native aggregates (SQLite) the scan reads only Meta + Custom; the
+      # type histogram, total count and per-day series come from the store in
+      # #finalize. Other stores keep the single all-types scan — the aggregate
+      # fallbacks would each re-scan the store.
       SCAN_TYPES = [META, CUSTOM].freeze
 
       INTERNAL_METADATA_KEYS = %w[userAgent url referrer viewport has_errors entry_url entry_referrer
@@ -120,10 +116,9 @@ module Sentiero
         store.supports_event_aggregates? ? SCAN_TYPES : nil
       end
 
-      # The figures the SCAN_TYPES filter hides from the scan, recomputed by
-      # the store without reading payloads. Selection is session-window based
-      # (like the scan itself); the nil bucket (non-integer client types) is
-      # counted in the total but not the histogram.
+      # The figures SCAN_TYPES hides from the scan, recomputed payload-free by
+      # the store. The nil bucket (non-integer client types) counts toward the
+      # total but not the histogram.
       def collect_store_aggregates(acc, scan_cap)
         type_counts = store.event_type_counts(limit: scan_cap, since: acc.since, until_time: acc.until_time)
         type_counts.each { |type, count| acc.event_types[type] = count if type }
