@@ -36,11 +36,8 @@ export function fetchAllEvents(url, callback) {
 
         allEvents = allEvents.concat(events);
 
-        // Paginate until an EMPTY page. The server page size is configurable
-        // (max_events_per_page) and may be smaller than any client constant —
-        // a "short page means last page" test against PAGE_SIZE silently
-        // truncated every replay at the server's page size when it was
-        // configured below 1000.
+        // The server page size is configurable — only an empty page (checked
+        // above) ends pagination; a short page must not.
         const lastEvent = events[events.length - 1];
         if (lastEvent && lastEvent.timestamp) {
           const sep = url.indexOf("?") === -1 ? "?" : "&";
