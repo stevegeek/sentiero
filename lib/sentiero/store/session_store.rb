@@ -41,13 +41,11 @@ module Sentiero
       # sessions first, capped at `limit`. Built from list_sessions/get_session/
       # get_events so every backend gets it free; stores may override.
       #
-      # `types:` (integer rrweb event types) narrows the yielded events arrays
-      # — analytics scans use it to skip DOM-snapshot payloads they never read.
-      # Summaries and the yielded window set are NOT narrowed: they always
-      # describe the whole session, and carry :window_starts
-      # ({window_id => first event timestamp}) so replay deep-link offsets
-      # stay anchored to the window's true start even when the first event
-      # was filtered out.
+      # `types:` (integer rrweb event types) narrows only the yielded events
+      # arrays. Summaries and the yielded window set always describe the whole
+      # session, and carry :window_starts ({window_id => first event
+      # timestamp}) so replay offsets stay anchored when a window's first
+      # event is filtered out.
       def each_session_events(limit: nil, since: nil, until_time: nil, types: nil)
         unless block_given?
           return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time, types: types)
@@ -73,10 +71,8 @@ module Sentiero
         end
       end
 
-      # {integer_type => count} across the sessions a scan with the same
-      # bounds would cover; events with a non-integer "type" tally under nil.
-      # Absent types have no key. Built on each_session_events so every
-      # backend gets it free; SQLite overrides with a payload-free aggregate.
+      # {integer_type => count}; non-integer client "type" values tally under
+      # nil. SQLite overrides with a payload-free aggregate.
       def event_type_counts(limit: nil, since: nil, until_time: nil)
         counts = {}
         each_session_events(limit: limit, since: since, until_time: until_time) do |_summary, _window_id, events|
@@ -89,10 +85,9 @@ module Sentiero
         counts
       end
 
-      # {"YYYY-MM-DD" (UTC day of the event's ms timestamp) => count} across
-      # the sessions a scan with the same bounds would cover; events without a
-      # timestamp are skipped. Built on each_session_events so every backend
-      # gets it free; SQLite overrides with a payload-free aggregate.
+      # {"YYYY-MM-DD" (UTC day of the ms timestamp) => count}; events without
+      # a numeric timestamp are skipped. SQLite overrides with a payload-free
+      # aggregate.
       def event_counts_by_day(limit: nil, since: nil, until_time: nil)
         counts = {}
         each_session_events(limit: limit, since: since, until_time: until_time) do |_summary, _window_id, events|

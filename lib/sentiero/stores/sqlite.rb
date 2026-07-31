@@ -116,9 +116,8 @@ module Sentiero
 
       # Batched scan: avoids the base's get_session + get_events-per-window N+1.
       SCAN_IN_CHUNK = 500
-      # Sessions whose events are materialized at once during a scan. Bounds
-      # peak memory: an unfiltered scan of N-hundred rrweb sessions would
-      # otherwise hold every parsed payload (GBs) before the first yield.
+      # Sessions materialized at once per scan — bounds peak memory (an
+      # unchunked scan held every parsed payload before the first yield).
       EVENT_LOAD_CHUNK = 25
 
       def each_session_events(limit: nil, since: nil, until_time: nil, types: nil)
@@ -130,10 +129,8 @@ module Sentiero
         rows = scan_session_rows(cap, since, until_time)
         return if rows.empty?
 
-        # Summaries always describe the whole session (real event counts,
-        # window list and true window start timestamps), so a typed scan
-        # reports the same shape as a full one — including windows whose every
-        # event was filtered out.
+        # Summaries always describe the whole session, so a typed scan reports
+        # the same shape as a full one — including fully-filtered windows.
         shapes = window_shapes(rows.map { |row| row["session_id"] })
 
         rows.each_slice(EVENT_LOAD_CHUNK) do |chunk|
@@ -571,9 +568,8 @@ module Sentiero
         grouped
       end
 
-      # {session_id => {window_id => {count:, start:}}} for the scanned
-      # sessions — index-only, so a typed scan can report full-session
-      # summaries and true window starts without reading any payloads.
+      # {session_id => {window_id => {count:, start:}}} — index-only, so a
+      # typed scan reports full-session summaries without reading payloads.
       def window_shapes(session_ids)
         shapes = Hash.new { |h, sid| h[sid] = {} }
         session_ids.each_slice(SCAN_IN_CHUNK) do |chunk|
@@ -712,14 +708,11 @@ module Sentiero
         end
       end
 
-      # File-backed stores rely on per-thread connections (see #db) for thread
-      # safety — WAL lets the scan's reader run beside a writer, so no global
-      # lock is needed and a slow dashboard scan can't stall recorder ingest.
-      # In-memory stores share one connection, so those DO serialize every
-      # public op through the reentrant @monitor (reentrant for internal calls
-      # like save_occurrence -> save_metadata). Wrap-all so new methods stay
-      # covered; defined last to see them. The same wrapper applies utf8_arg
-      # to every argument (see above).
+      # File-backed stores are thread-safe via per-thread WAL connections (see
+      # #db); in-memory stores share one connection, so their public ops
+      # serialize through the reentrant @monitor (reentrant: save_occurrence
+      # -> save_metadata). Wrap-all, defined last, so new methods stay
+      # covered; the wrapper also applies utf8_arg to every argument.
       synchronized = public_instance_methods(false)
       prepend(Module.new do
         synchronized.each do |method_name|
