@@ -13,7 +13,7 @@ module Sentiero
       def analyze(limit: nil, since: nil, until_time: nil)
         scroll = ScrollCollector.new(max_urls: MAX_URLS)
 
-        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time) do |_summary, _window_id, events|
+        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time, types: [INCREMENTAL, META]) do |_summary, _window_id, events|
           each_page_segment(events) do |url, segment, _anchor|
             scroll.observe(url, segment) if url
           end

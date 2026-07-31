@@ -44,10 +44,10 @@ module Sentiero
         sessions = {}
         accumulation_capped = false
 
-        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time) do |summary, window_id, events|
+        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time, types: [META, CUSTOM]) do |summary, window_id, events|
           session_id = summary[:session_id]
 
-          anchor = events.first&.fetch("timestamp", nil)
+          anchor = window_anchor(summary, window_id, events)
           events.each do |event|
             tag = custom_tag(event)
             next unless tag

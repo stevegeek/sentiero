@@ -44,8 +44,10 @@ module Sentiero
 
       # Batched scan: one events query for the whole session page instead of the
       # base's get_session + get_events per window.
-      def each_session_events(limit: nil, since: nil, until_time: nil)
-        return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time) unless block_given?
+      def each_session_events(limit: nil, since: nil, until_time: nil, types: nil)
+        unless block_given?
+          return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time, types: types)
+        end
 
         cap = limit || limits.analytics_max_scan_sessions
         summaries = list_sessions(limit: cap, since: since, until_time: until_time)
@@ -53,7 +55,12 @@ module Sentiero
 
         events = events_by_session_window(summaries.map { |summary| summary[:session_id] })
         summaries.each do |summary|
-          (events[summary[:session_id]] || {}).each do |window_id, window_events|
+          windows = events[summary[:session_id]] || {}
+          summary = summary.merge(
+            window_starts: windows.transform_values { |window_events| window_events.first&.fetch("timestamp", nil) }
+          )
+          windows.each do |window_id, window_events|
+            window_events = window_events.select { |event| types.include?(event["type"]) } if types
             yield summary, window_id, window_events
           end
         end

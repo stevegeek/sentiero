@@ -40,8 +40,16 @@ module Sentiero
       # Yields [session_summary_hash, window_id, events_array] per window, newest
       # sessions first, capped at `limit`. Built from list_sessions/get_session/
       # get_events so every backend gets it free; stores may override.
-      def each_session_events(limit: nil, since: nil, until_time: nil)
-        return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time) unless block_given?
+      #
+      # `types:` (integer rrweb event types) narrows only the yielded events
+      # arrays. Summaries and the yielded window set always describe the whole
+      # session, and carry :window_starts ({window_id => first event
+      # timestamp}) so replay offsets stay anchored when a window's first
+      # event is filtered out.
+      def each_session_events(limit: nil, since: nil, until_time: nil, types: nil)
+        unless block_given?
+          return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time, types: types)
+        end
 
         cap = limit || limits.analytics_max_scan_sessions
         sessions = list_sessions(limit: cap, since: since, until_time: until_time)
@@ -51,12 +59,47 @@ module Sentiero
           next unless session
 
           windows = session[:windows] || []
+          summary = summary.merge(
+            window_starts: windows.to_h { |window| [window[:window_id], window[:first_event_at]] }
+          )
           windows.each do |window|
             window_id = window[:window_id]
             events = get_events(WindowRef.new(summary[:session_id], window_id))
+            events = events.select { |event| types.include?(event["type"]) } if types
             yield summary, window_id, events
           end
         end
+      end
+
+      # {integer_type => count}; non-integer client "type" values tally under
+      # nil. SQLite overrides with a payload-free aggregate.
+      def event_type_counts(limit: nil, since: nil, until_time: nil)
+        counts = {}
+        each_session_events(limit: limit, since: since, until_time: until_time) do |_summary, _window_id, events|
+          events.each do |event|
+            type = event["type"]
+            key = type.is_a?(Integer) ? type : nil
+            counts[key] = (counts[key] || 0) + 1
+          end
+        end
+        counts
+      end
+
+      # {"YYYY-MM-DD" (UTC day of the ms timestamp) => count}; events without
+      # a numeric timestamp are skipped. SQLite overrides with a payload-free
+      # aggregate.
+      def event_counts_by_day(limit: nil, since: nil, until_time: nil)
+        counts = {}
+        each_session_events(limit: limit, since: since, until_time: until_time) do |_summary, _window_id, events|
+          events.each do |event|
+            timestamp = event["timestamp"]
+            next unless timestamp.is_a?(Numeric)
+
+            day = Time.at(timestamp / 1000.0).utc.to_date.to_s
+            counts[day] = (counts[day] || 0) + 1
+          end
+        end
+        counts
       end
 
       # Deletes every session whose updated_at is older than `seconds` ago,

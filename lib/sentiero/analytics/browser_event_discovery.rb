@@ -21,8 +21,8 @@ module Sentiero
         rows = []
         truncated = false
 
-        _scanned, hit_cap = scan_sessions(since: since, until_time: until_time) do |summary, window_id, events|
-          anchor = events.first&.fetch("timestamp", nil)
+        _scanned, hit_cap = scan_sessions(since: since, until_time: until_time, types: [META, CUSTOM]) do |summary, window_id, events|
+          anchor = window_anchor(summary, window_id, events)
           events.each do |event|
             next unless browser_event?(event)
 
