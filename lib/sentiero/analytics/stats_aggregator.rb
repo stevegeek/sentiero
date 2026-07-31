@@ -18,6 +18,12 @@ module Sentiero
 
       NAVIGATION_TAG = "navigation"
 
+      # With native aggregates (SQLite) the scan reads only Meta + Custom; the
+      # type histogram, total count and per-day series come from the store in
+      # #finalize. Other stores keep the single all-types scan — the aggregate
+      # fallbacks would each re-scan the store.
+      SCAN_TYPES = [META, CUSTOM].freeze
+
       INTERNAL_METADATA_KEYS = %w[userAgent url referrer viewport has_errors entry_url entry_referrer
         geo_country geo_city geo_region geo_timezone].freeze
 
@@ -46,7 +52,7 @@ module Sentiero
         acc = new_accumulator(since, until_time)
         seen_sessions = {}
 
-        store.each_session_events(limit: scan_cap, since: since, until_time: until_time) do |summary, _window_id, events|
+        store.each_session_events(limit: scan_cap, since: since, until_time: until_time, types: scan_types) do |summary, _window_id, events|
           accumulate_window(acc, seen_sessions, summary, events)
         end
 
@@ -75,7 +81,7 @@ module Sentiero
         current = {acc: new_accumulator(since, until_time), seen: {}}
         prior = {acc: new_accumulator(prior_since, prior_until), seen: {}}
 
-        store.each_session_events(limit: scan_cap, since: prior_since, until_time: until_time) do |summary, _window_id, events|
+        store.each_session_events(limit: scan_cap, since: prior_since, until_time: until_time, types: scan_types) do |summary, _window_id, events|
           bucket = (summary[:updated_at] >= since) ? current : prior
           accumulate_window(bucket[:acc], bucket[:seen], summary, events)
         end
@@ -101,8 +107,25 @@ module Sentiero
 
       def finalize(acc, seen_sessions, scan_cap, overlay:)
         tally_entries(acc, seen_sessions)
+        collect_store_aggregates(acc, scan_cap) if store.supports_event_aggregates?
         overlay_truncated = overlay ? collect_server_overlay(acc) : false
         ResultBuilder.new(store).build(acc, seen_sessions.size, scan_cap, overlay_truncated)
+      end
+
+      def scan_types
+        store.supports_event_aggregates? ? SCAN_TYPES : nil
+      end
+
+      # The figures SCAN_TYPES hides from the scan, recomputed payload-free by
+      # the store. The nil bucket (non-integer client types) counts toward the
+      # total but not the histogram.
+      def collect_store_aggregates(acc, scan_cap)
+        type_counts = store.event_type_counts(limit: scan_cap, since: acc.since, until_time: acc.until_time)
+        type_counts.each { |type, count| acc.event_types[type] = count if type }
+        acc.total_events = type_counts.values.sum
+
+        store.event_counts_by_day(limit: scan_cap, since: acc.since, until_time: acc.until_time)
+          .each { |day, count| acc.per_day_events[day] = count }
       end
 
       # range_days - 1: the start day is itself one of the range_days buckets.
@@ -205,14 +228,17 @@ module Sentiero
       end
 
       def collect_events(acc, events)
+        aggregates_native = store.supports_event_aggregates?
         events.each do |event|
           next unless in_window?(acc, event["timestamp"])
 
           type = event["type"]
-          acc.event_types[type] += 1
-          acc.total_events += 1
+          unless aggregates_native
+            acc.event_types[type] += 1
+            acc.total_events += 1
+            record_event_day(acc, event)
+          end
           tally_custom_tag(acc, event) if type == CUSTOM
-          record_event_day(acc, event)
           record_error_day(acc, event) if error_event?(event)
         end
       end

@@ -88,6 +88,54 @@ module Sentiero
         result = store.get_events(Sentiero::WindowRef.new("s1", "w1"))
         assert_equal 1, result.size
       end
+
+      # Databases written before the events.type column existed must be
+      # rebuilt on open, with type backfilled from each row's JSON — and
+      # non-integer "type" values must stay NULL, not become 0 (rrweb type 0
+      # is DomContentLoaded).
+      def test_opening_a_pre_type_column_database_migrates_and_backfills
+        skip "sqlite3 gem not available" unless SQLITE_AVAILABLE
+
+        path = ::File.join(@tmpdir, "legacy.db")
+        legacy = ::SQLite3::Database.new(path)
+        legacy.execute_batch(<<~SQL)
+          CREATE TABLE sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL UNIQUE,
+            created_at REAL NOT NULL,
+            updated_at REAL NOT NULL,
+            first_event_at REAL,
+            last_event_at REAL,
+            metadata TEXT
+          );
+          CREATE TABLE events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            window_id TEXT NOT NULL,
+            timestamp REAL,
+            data TEXT NOT NULL
+          );
+          CREATE INDEX idx_events_session_window_ts ON events(session_id, window_id, timestamp);
+          INSERT INTO sessions (session_id, created_at, updated_at, first_event_at, last_event_at)
+            VALUES ('legacy-s1', 1.0, 1.0, 1.0, 3.0);
+          INSERT INTO events (session_id, window_id, timestamp, data) VALUES
+            ('legacy-s1', 'w1', 1.0, '{"timestamp":1.0,"type":2,"data":{"node":{}}}'),
+            ('legacy-s1', 'w1', 2.0, '{"timestamp":2.0,"type":5,"data":{"tag":"navigation"}}'),
+            ('legacy-s1', 'w1', 3.0, '{"timestamp":3.0,"type":"mouse","data":{}}');
+        SQL
+        legacy.close
+
+        store = Sentiero::Stores::SQLite.new(path: path)
+
+        assert_equal 3, store.get_events(Sentiero::WindowRef.new("legacy-s1", "w1")).size
+
+        captured = nil
+        store.each_session_events(types: [5]) { |_s, _w, evts| captured = evts }
+        assert_equal [5], captured.map { |event| event["type"] }
+
+        types = store.send(:db).execute("SELECT type FROM events ORDER BY timestamp").map { |r| r["type"] }
+        assert_equal [2, 5, nil], types
+      end
     end
   end
 end

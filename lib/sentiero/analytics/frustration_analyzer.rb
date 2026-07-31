@@ -47,7 +47,7 @@ module Sentiero
         pages = {}
         accumulation_capped = false
 
-        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time) do |summary, window_id, events|
+        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time, types: [INCREMENTAL, META, CUSTOM]) do |summary, window_id, events|
           incidents = Frustration::Detectors.detect_frustration_events(events)
           next if incidents.empty?
 

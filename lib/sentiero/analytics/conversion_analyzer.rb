@@ -32,7 +32,7 @@ module Sentiero
         sessions = {}
         @truncated = false
 
-        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time) do |summary, window_id, events|
+        _scanned, hit_cap = scan_sessions(limit: limit, since: since, until_time: until_time, types: [META, CUSTOM]) do |summary, window_id, events|
           session_id = summary[:session_id]
           state = sessions[session_id] ||= new_state(summary, window_id)
 

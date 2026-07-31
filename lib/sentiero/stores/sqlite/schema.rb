@@ -3,8 +3,21 @@
 module Sentiero
   module Stores
     class SQLite
-      # Table/index definitions for the store's single SQLite3 connection.
+      # Table/index definitions for the store's SQLite connections.
       module Schema
+        # The events.type column (denormalized rrweb event type) sits BEFORE
+        # the data blob on purpose: SQLite reads record columns left to right,
+        # so a typed scan can check `type` without ever touching the (often
+        # multi-page overflow) data payload of non-matching rows.
+        EVENTS_COLUMNS = <<~SQL
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          session_id TEXT NOT NULL,
+          window_id TEXT NOT NULL,
+          timestamp REAL,
+          type INTEGER,
+          data TEXT NOT NULL
+        SQL
+
         def self.create(db)
           db.execute_batch(<<~SQL)
             CREATE TABLE IF NOT EXISTS sessions (
@@ -21,11 +34,7 @@ module Sentiero
             CREATE INDEX IF NOT EXISTS idx_sessions_updated_at ON sessions(updated_at);
 
             CREATE TABLE IF NOT EXISTS events (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              session_id TEXT NOT NULL,
-              window_id TEXT NOT NULL,
-              timestamp REAL,
-              data TEXT NOT NULL
+              #{EVENTS_COLUMNS}
             );
 
             CREATE INDEX IF NOT EXISTS idx_events_session_window_ts ON events(session_id, window_id, timestamp);
@@ -72,6 +81,34 @@ module Sentiero
             CREATE INDEX IF NOT EXISTS idx_server_events_project ON server_events(project);
             CREATE INDEX IF NOT EXISTS idx_server_events_session ON server_events(session_id);
           SQL
+
+          migrate_events_type!(db)
+        end
+
+        # Databases created before the events.type column existed get a
+        # one-time table rebuild (not ALTER ADD COLUMN — that would append
+        # type AFTER the data blob, defeating the column-order optimization
+        # above). Backfills type from each row's JSON payload.
+        def self.migrate_events_type!(db)
+          columns = db.execute("PRAGMA table_info(events)").map { |row| row["name"] }
+          return if columns.include?("type")
+
+          db.transaction(:immediate) do
+            db.execute_batch(<<~SQL)
+              CREATE TABLE events_migrated (
+                #{EVENTS_COLUMNS}
+              );
+              INSERT INTO events_migrated (id, session_id, window_id, timestamp, type, data)
+                SELECT id, session_id, window_id, timestamp,
+                       CASE WHEN json_type(data, '$.type') = 'integer'
+                            THEN json_extract(data, '$.type') END,
+                       data
+                FROM events;
+              DROP TABLE events;
+              ALTER TABLE events_migrated RENAME TO events;
+              CREATE INDEX idx_events_session_window_ts ON events(session_id, window_id, timestamp);
+            SQL
+          end
         end
       end
     end

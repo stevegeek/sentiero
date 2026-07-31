@@ -76,8 +76,10 @@ module Sentiero
 
       # Batched scan: three pipelined round-trips total instead of the base's
       # get_session + get_events per window.
-      def each_session_events(limit: nil, since: nil, until_time: nil)
-        return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time) unless block_given?
+      def each_session_events(limit: nil, since: nil, until_time: nil, types: nil)
+        unless block_given?
+          return enum_for(:each_session_events, limit: limit, since: since, until_time: until_time, types: types)
+        end
 
         cap = limit || limits.analytics_max_scan_sessions
         min = since ? since.to_f.to_s : "-inf"
@@ -114,7 +116,13 @@ module Sentiero
 
           windows = window_ids.to_h { |wid| [wid, parse_events(event_futures[[sid, wid]].value)] }
           summary = scan_summary(sid, meta, window_ids, windows.values.sum(&:size))
-          windows.each { |wid, events| yield summary, wid, events }
+          summary = summary.merge(
+            window_starts: windows.transform_values { |events| events.first&.fetch("timestamp", nil) }
+          )
+          windows.each do |wid, events|
+            events = events.select { |event| types.include?(event["type"]) } if types
+            yield summary, wid, events
+          end
         end
       end
 

@@ -95,7 +95,7 @@ module Sentiero
         headers = %w[session_id window_id timestamp tag]
         rows = []
 
-        store.each_session_events(limit: scan_cap, since: since, until_time: until_time) do |summary, window_id, events|
+        store.each_session_events(limit: scan_cap, since: since, until_time: until_time, types: [CUSTOM]) do |summary, window_id, events|
           events.each do |event|
             next unless event["type"] == CUSTOM
             tag = event.dig("data", "tag")
