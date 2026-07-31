@@ -26,8 +26,6 @@ export const EVENT_CATEGORIES = {
   server_event: { label: "Server Event", color: "#7c3aed" },
 };
 
-export const PAGE_SIZE = 1000;
-
 export const IDLE_GAP_THRESHOLD_MS = 5000;
 export const IDLE_GAP_BAR_PCT = 3;
 
