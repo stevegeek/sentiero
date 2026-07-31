@@ -1,5 +1,4 @@
 import {
-  PAGE_SIZE,
   TYPE_INCREMENTAL,
   TYPE_META,
   TYPE_CUSTOM,
@@ -37,11 +36,8 @@ export function fetchAllEvents(url, callback) {
 
         allEvents = allEvents.concat(events);
 
-        if (events.length < PAGE_SIZE) {
-          callback(null, allEvents);
-          return;
-        }
-
+        // The server page size is configurable — only an empty page (checked
+        // above) ends pagination; a short page must not.
         const lastEvent = events[events.length - 1];
         if (lastEvent && lastEvent.timestamp) {
           const sep = url.indexOf("?") === -1 ? "?" : "&";
