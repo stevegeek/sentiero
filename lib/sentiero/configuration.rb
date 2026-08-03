@@ -115,12 +115,10 @@ module Sentiero
       @session_max_age = clamp_positive_seconds(value, DEFAULT_SESSION_MAX_AGE)
     end
 
-    # Byte cap on ingest request bodies, enforced on both the raw and the
-    # gunzipped size; dense DOMs can produce FullSnapshots past the default.
-    # There is no "unlimited" setting — the cap is what keeps a gzip bomb
-    # bounded, and each request may allocate up to ~2x this value while
-    # reading — so nil/zero/negative/non-numeric fall back to the default
-    # rather than crash the public events endpoint per request.
+    # Byte cap on ingest request bodies, raw and gunzipped (dense DOMs can
+    # push FullSnapshots past the default). No "unlimited" setting: the cap
+    # is the gzip-bomb bound and each request may allocate ~2x it, so
+    # invalid values fall back to the default.
     def max_body_size=(value)
       @max_body_size = (value.is_a?(Numeric) && value.finite? && value > 0) ? value.to_i : DEFAULT_MAX_BODY_SIZE
     end

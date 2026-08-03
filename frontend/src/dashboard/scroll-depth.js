@@ -37,8 +37,6 @@ function viewportHeight(events) {
 // viewport bottom reached ((y + vh) / vh), a multiple (e.g. 3.1), not a percent;
 // null when no viewport recorded. Whole result null when no scroll events.
 export function computeScrollDepth(events) {
-  // Rounded before the null gate so a sub-half-pixel scroll can't render as
-  // "0px" alongside a non-null viewport multiple.
   const y = Math.round(maxScrollY(events));
   if (y <= 0) return null;
   const vh = viewportHeight(events);
