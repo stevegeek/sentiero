@@ -35,7 +35,7 @@ module Sentiero
         # could still POST here.
         return dropped(env) if opted_out?(env) || gpc_signaled?(env)
 
-        raw_body, error = BodyReader.read(env)
+        raw_body, error = BodyReader.read(env, max_bytes: Sentiero.configuration.max_body_size)
         if error
           status, message = BodyReader::ERRORS[error]
           return cors_error(env, status, message)

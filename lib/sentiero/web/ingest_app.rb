@@ -65,7 +65,7 @@ module Sentiero
       end
 
       def read_body(env)
-        raw, error = BodyReader.read(env)
+        raw, error = BodyReader.read(env, max_bytes: Sentiero.configuration.max_body_size)
         return [raw, nil] unless error
 
         status, message = BodyReader::ERRORS[error]
