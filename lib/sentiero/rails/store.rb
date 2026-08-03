@@ -66,8 +66,18 @@ module Sentiero
         end
       end
 
-      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil)
+      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil,
+        min_duration_ms: nil, min_events: nil)
         scope = filtered_session_scope(since:, until_time:, search:)
+        if sort_by == "event_count" || min_duration_ms || min_events
+          scope = with_event_aggregates(scope)
+        end
+        if min_events
+          scope = scope.having("COUNT(#{Event.table_name}.id) >= ?", min_events)
+        end
+        if min_duration_ms
+          scope = scope.having("MAX(#{Event.table_name}.timestamp) - MIN(#{Event.table_name}.timestamp) >= ?", min_duration_ms)
+        end
         scope = ordered_session_scope(scope, sort_by)
 
         sessions = scope.offset(offset).limit(limit).to_a
@@ -377,22 +387,22 @@ module Sentiero
 
         if search && !search.empty?
           pattern = "%#{search}%"
+          table = Session.table_name
           scope = if metadata_column?
-            scope.where("session_id LIKE ? OR CAST(metadata AS TEXT) LIKE ?", pattern, pattern)
+            scope.where("#{table}.session_id LIKE ? OR CAST(#{table}.metadata AS TEXT) LIKE ?", pattern, pattern)
           else
-            scope.where("session_id LIKE ?", pattern)
+            scope.where("#{table}.session_id LIKE ?", pattern)
           end
         end
 
         scope
       end
 
+      # The aggregate join for event_count sorting and thresholds is applied
+      # once in list_sessions; this only orders.
       def ordered_session_scope(scope, sort_by)
         if sort_by == "event_count"
-          scope
-            .joins("LEFT JOIN #{Event.table_name} ON #{Event.table_name}.session_id = #{Session.table_name}.session_id")
-            .group("#{Session.table_name}.id")
-            .order(Arel.sql("COUNT(#{Event.table_name}.id) DESC"))
+          scope.order(Arel.sql("COUNT(#{Event.table_name}.id) DESC"))
         else
           sort_column = case sort_by
           when "created_at" then :created_at
@@ -400,6 +410,12 @@ module Sentiero
           end
           scope.order(sort_column => :desc)
         end
+      end
+
+      def with_event_aggregates(scope)
+        scope
+          .joins("LEFT JOIN #{Event.table_name} ON #{Event.table_name}.session_id = #{Session.table_name}.session_id")
+          .group("#{Session.table_name}.id")
       end
 
       def window_ids_for(session_ids)
