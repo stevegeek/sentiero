@@ -16,6 +16,7 @@ module Sentiero
     class SQLite < Store
       # Loaded after the class line above establishes SQLite < Store, so
       # schema.rb's own `class SQLite` reopen doesn't hit a superclass mismatch.
+      require_relative "sqlite/payload_codec"
       require_relative "sqlite/schema"
 
       # Single-file SQLite store for single-process production and dev.
@@ -101,7 +102,7 @@ module Sentiero
             events.each do |event|
               type = event["type"]
               stmt.execute(session_id, window_id, event["timestamp"]&.to_f,
-                type.is_a?(Integer) ? type : nil, JSON.generate(event))
+                type.is_a?(Integer) ? type : nil, PayloadCodec.encode(JSON.generate(event)))
             end
           ensure
             stmt.close
@@ -300,7 +301,7 @@ module Sentiero
           params << limit.to_i
         end
 
-        db.execute(sql, params).map { |event_row| JSON.parse(event_row["data"]) }
+        db.execute(sql, params).map { |event_row| JSON.parse(PayloadCodec.decode(event_row["data"])) }
       end
 
       def save_metadata(session_id, metadata)
@@ -570,7 +571,7 @@ module Sentiero
             "SELECT session_id, window_id, data FROM events WHERE session_id IN (#{placeholders})#{type_clause} ORDER BY timestamp ASC",
             chunk + type_params
           ).each do |row|
-            (grouped[row["session_id"]][row["window_id"]] ||= []) << JSON.parse(row["data"])
+            (grouped[row["session_id"]][row["window_id"]] ||= []) << JSON.parse(PayloadCodec.decode(row["data"]))
           end
         end
         grouped

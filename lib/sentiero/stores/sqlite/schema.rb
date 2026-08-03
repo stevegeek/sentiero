@@ -83,6 +83,7 @@ module Sentiero
           SQL
 
           migrate_events_type!(db)
+          migrate_compress_payloads!(db)
         end
 
         # Databases created before the events.type column existed get a
@@ -109,6 +110,34 @@ module Sentiero
               CREATE INDEX idx_events_session_window_ts ON events(session_id, window_id, timestamp);
             SQL
           end
+        end
+
+        # user_version 1 = every large payload is zlib-compressed (PayloadCodec).
+        SCHEMA_VERSION = 1
+
+        # One-time pass compressing pre-existing plain-TEXT payloads. Batched
+        # in short transactions so a live recorder's ingest writes interleave
+        # instead of timing out behind one giant lock. Guarded by
+        # PRAGMA user_version, so subsequent opens skip the table scan.
+        # Frees pages for reuse but does not shrink the file — VACUUM manually
+        # to reclaim disk.
+        def self.migrate_compress_payloads!(db)
+          return if db.get_first_value("PRAGMA user_version").to_i >= SCHEMA_VERSION
+
+          loop do
+            rows = db.execute(
+              "SELECT id, data FROM events WHERE typeof(data) = 'text' AND LENGTH(data) >= ? LIMIT 500",
+              [PayloadCodec::COMPRESSION_THRESHOLD]
+            )
+            break if rows.empty?
+
+            db.transaction(:immediate) do
+              rows.each do |row|
+                db.execute("UPDATE events SET data = ? WHERE id = ?", [PayloadCodec.encode(row["data"]), row["id"]])
+              end
+            end
+          end
+          db.execute("PRAGMA user_version = #{SCHEMA_VERSION}")
         end
       end
     end
