@@ -1,13 +1,13 @@
 PATH
   remote: .
   specs:
-    sentiero (1.0.0.beta1)
+    sentiero (1.0.0.beta2)
       concurrent-ruby (~> 1.1)
       rack (>= 2.0, < 4.0)
-    sentiero-rails (1.0.0.beta1)
+    sentiero-rails (1.0.0.beta2)
       activerecord (>= 7.0, < 9.0)
       railties (>= 7.0, < 9.0)
-      sentiero (~> 1.0.0.beta1)
+      sentiero (~> 1.0.0.beta2)
 
 GEM
   remote: https://rubygems.org/
