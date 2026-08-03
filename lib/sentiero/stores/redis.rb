@@ -130,11 +130,12 @@ module Sentiero
       # ZREVRANGEBYSCORE with LIMIT pages the score-ordered sessions zset
       # directly. created_at/event_count sort or search need every matching
       # session's summary first, so those go through the general path below.
-      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil)
+      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil,
+        min_duration_ms: nil, min_events: nil)
         min = since ? since.to_f.to_s : "-inf"
         max = until_time ? until_time.to_f.to_s : "+inf"
 
-        if default_sort?(sort_by) && (search.nil? || search.empty?)
+        if default_sort?(sort_by) && (search.nil? || search.empty?) && min_duration_ms.nil? && min_events.nil?
           session_ids = @redis.zrevrangebyscore(@keys.sessions, max, min, limit: [offset, limit])
           return build_session_summaries(session_ids)
         end
@@ -145,6 +146,9 @@ module Sentiero
         summaries = build_session_summaries(session_ids)
 
         summaries.select! { |summary| session_matches_search?(summary, search) } if search && !search.empty?
+        if min_duration_ms || min_events
+          summaries.select! { |summary| session_meets_thresholds?(summary, min_duration_ms, min_events) }
+        end
 
         case sort_by
         when "created_at"

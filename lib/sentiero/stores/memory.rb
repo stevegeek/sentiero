@@ -64,9 +64,11 @@ module Sentiero
         nil
       end
 
-      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil)
+      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil,
+        min_duration_ms: nil, min_events: nil)
         pairs = @sessions.each_pair.to_a
-        pairs = filter_sessions(pairs, since: since, until_time: until_time, search: search)
+        pairs = filter_sessions(pairs, since: since, until_time: until_time, search: search,
+          min_duration_ms: min_duration_ms, min_events: min_events)
         pairs = sort_sessions(pairs, sort_by)
         page = pairs.slice(offset, limit) || []
         page.map { |sid, entry| session_summary(sid, entry) }
@@ -274,7 +276,7 @@ module Sentiero
 
       private
 
-      def filter_sessions(pairs, since:, until_time:, search:)
+      def filter_sessions(pairs, since:, until_time:, search:, min_duration_ms: nil, min_events: nil)
         if since
           since_f = since.to_f
           pairs = pairs.select { |_sid, entry| entry.meta.updated_at >= since_f }
@@ -288,6 +290,16 @@ module Sentiero
           pairs = pairs.select { |sid, entry|
             sid.downcase.include?(search_down) ||
               entry.meta.session_metadata&.values&.any? { |value| value.to_s.downcase.include?(search_down) }
+          }
+        end
+        if min_events
+          pairs = pairs.select { |_sid, entry| entry.windows.values.sum(&:size) >= min_events }
+        end
+        if min_duration_ms
+          pairs = pairs.select { |_sid, entry|
+            first = entry.meta.first_event_at
+            last = entry.meta.last_event_at
+            first && last && (last - first) >= min_duration_ms
           }
         end
         pairs

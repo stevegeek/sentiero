@@ -158,6 +158,61 @@ module StoreContractTests
     assert_equal [], sessions
   end
 
+  def test_list_sessions_min_events_keeps_sessions_at_or_above_threshold
+    @store.save_events(ref("s1", "w1"), make_events(2))
+    @store.save_events(ref("s2", "w1"), make_events(3))
+    @store.save_events(ref("s3", "w1"), make_events(5))
+
+    sessions = @store.list_sessions(limit: 10, min_events: 3)
+
+    assert_equal %w[s2 s3], sessions.map { |s| s[:session_id] }.sort
+  end
+
+  def test_list_sessions_min_duration_keeps_sessions_at_or_above_threshold
+    @store.save_events(ref("s1", "w1"), [make_event(timestamp: 1000.0), make_event(timestamp: 3000.0)])
+    @store.save_events(ref("s2", "w1"), [make_event(timestamp: 1000.0), make_event(timestamp: 6000.0)])
+    @store.save_events(ref("s3", "w1"), [make_event(timestamp: 1000.0), make_event(timestamp: 61000.0)])
+
+    sessions = @store.list_sessions(limit: 10, min_duration_ms: 5000)
+
+    assert_equal %w[s2 s3], sessions.map { |s| s[:session_id] }.sort
+  end
+
+  def test_list_sessions_thresholds_combine
+    @store.save_events(ref("s1", "w1"), make_events(10))
+    @store.save_events(ref("s2", "w1"), [make_event(timestamp: 1000.0), make_event(timestamp: 61000.0)])
+    @store.save_events(ref("s3", "w1"), make_events(10, start_ts: 1000.0, step: 10_000.0))
+
+    sessions = @store.list_sessions(limit: 10, min_events: 5, min_duration_ms: 30_000)
+
+    assert_equal %w[s3], sessions.map { |s| s[:session_id] }
+  end
+
+  def test_list_sessions_thresholds_compose_with_search
+    @store.save_events(ref("alpha1", "w1"), make_events(5))
+    @store.save_events(ref("beta1", "w1"), make_events(5))
+
+    sessions = @store.list_sessions(limit: 10, search: "alpha", min_events: 3)
+
+    assert_equal %w[alpha1], sessions.map { |s| s[:session_id] }
+  end
+
+  def test_list_sessions_thresholds_apply_before_pagination
+    @store.save_events(ref("q1", "w1"), make_events(5))
+    @store.save_events(ref("n1", "w1"), make_events(1))
+    @store.save_events(ref("q2", "w1"), make_events(5))
+    @store.save_events(ref("n2", "w1"), make_events(1))
+    @store.save_events(ref("q3", "w1"), make_events(5))
+
+    page1 = @store.list_sessions(limit: 2, offset: 0, min_events: 2)
+    page2 = @store.list_sessions(limit: 2, offset: 2, min_events: 2)
+
+    ids = (page1 + page2).map { |s| s[:session_id] }
+    assert_equal 2, page1.size
+    assert_equal 1, page2.size
+    assert_equal %w[q1 q2 q3], ids.sort
+  end
+
   def test_list_sessions_returns_empty_for_out_of_range_offset
     @store.save_events(ref("s1", "w1"), [make_event(timestamp: 1.0)])
     sessions = @store.list_sessions(limit: 10, offset: 100)

@@ -12,7 +12,13 @@ module Sentiero
         raise NoMethodError, "#{self.class}#save_events not implemented"
       end
 
-      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil)
+      # min_events keeps sessions with event_count >= min_events.
+      # min_duration_ms keeps sessions whose event-timestamp span
+      # (last_event_at - first_event_at, milliseconds) meets the threshold;
+      # sessions without event timestamps fail an active duration filter.
+      # Both apply before limit/offset.
+      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil,
+        min_duration_ms: nil, min_events: nil)
         raise NoMethodError, "#{self.class}#list_sessions not implemented"
       end
 
@@ -147,6 +153,20 @@ module Sentiero
                  first_event_at: first_event_at, last_event_at: last_event_at}
         entry[:metadata] = metadata if metadata && !metadata.empty?
         entry
+      end
+
+      # True when the summary clears the optional minimum thresholds. Duration
+      # needs both event timestamps: sessions without them fail an active
+      # duration filter.
+      def session_meets_thresholds?(summary, min_duration_ms, min_events)
+        return false if min_events && summary[:event_count] < min_events
+
+        if min_duration_ms
+          first = summary[:first_event_at]
+          last = summary[:last_event_at]
+          return false unless first && last && (last - first) >= min_duration_ms
+        end
+        true
       end
 
       # True when the search term (case-insensitive) appears in the session_id
