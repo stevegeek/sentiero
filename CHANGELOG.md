@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- The SQLite store compresses event payloads at rest: rrweb payloads of 1 KB
+  or more (FullSnapshots are ~93% of a production database's bytes) are
+  stored as zlib BLOBs — a 5-7x size reduction on real data. Reads sniff the
+  format per row, so mixed databases work; on first open of a pre-existing
+  database, a one-time batched migration compresses old rows (guarded by
+  `PRAGMA user_version`, so later opens skip the scan). Downgrading past
+  this version afterwards is not supported. The migration frees pages but
+  does not shrink the file — run `VACUUM` to reclaim disk.
+
 ## [1.0.0.beta1] - 2026-08-03
 
 Initial release.
