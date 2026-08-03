@@ -60,7 +60,8 @@ module Sentiero
         nil
       end
 
-      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil)
+      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil,
+        min_duration_ms: nil, min_events: nil)
         session_ids = list_session_ids
         return [] if session_ids.empty?
 
@@ -76,6 +77,9 @@ module Sentiero
         end
         if search && !search.empty?
           summaries = summaries.select { |summary| session_matches_search?(summary, search) }
+        end
+        if min_duration_ms || min_events
+          summaries = summaries.select { |summary| session_meets_thresholds?(summary, min_duration_ms, min_events) }
         end
 
         case sort_by

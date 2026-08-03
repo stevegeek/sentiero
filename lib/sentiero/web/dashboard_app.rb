@@ -102,6 +102,8 @@ module Sentiero
         search = params["search"]&.strip
         search = nil if search&.empty?
         has_errors_filter = params["has_errors"] == "true"
+        min_duration_s = positive_int_param(params["min_duration"])
+        min_events = positive_int_param(params["min_events"])
 
         sessions = fetch_sessions(
           has_errors_filter: has_errors_filter,
@@ -110,7 +112,9 @@ module Sentiero
           since: since,
           until_time: until_time,
           sort_by: sort_by,
-          search: search
+          search: search,
+          min_duration_ms: min_duration_s && min_duration_s * 1000,
+          min_events: min_events
         )
 
         sessions, has_next = take_page(sessions, per_page)
@@ -126,11 +130,14 @@ module Sentiero
           sort_by: sort_by || "updated_at",
           since: params["since"] || "",
           until_param: params["until"] || "",
-          has_errors: has_errors_filter
+          has_errors: has_errors_filter,
+          min_duration: min_duration_s&.to_s || "",
+          min_events: min_events&.to_s || ""
         ))
       end
 
-      def fetch_sessions(has_errors_filter:, per_page:, offset:, since:, until_time:, sort_by:, search:)
+      def fetch_sessions(has_errors_filter:, per_page:, offset:, since:, until_time:, sort_by:, search:,
+        min_duration_ms: nil, min_events: nil)
         unless has_errors_filter
           return Sentiero.store.list_sessions(
             limit: per_page + 1,
@@ -138,7 +145,9 @@ module Sentiero
             since: since,
             until_time: until_time,
             sort_by: sort_by,
-            search: search
+            search: search,
+            min_duration_ms: min_duration_ms,
+            min_events: min_events
           )
         end
 
@@ -152,10 +161,19 @@ module Sentiero
           since: since,
           until_time: until_time,
           sort_by: sort_by,
-          search: search
+          search: search,
+          min_duration_ms: min_duration_ms,
+          min_events: min_events
         ).select { |s| s[:metadata] && s[:metadata]["has_errors"] }
 
         all_matching.slice(offset, per_page + 1) || []
+      end
+
+      def positive_int_param(value)
+        return nil unless value.is_a?(String) && value.match?(/\A\d+\z/)
+
+        n = value.to_i
+        (n > 0) ? n : nil
       end
 
       def handle_session_redirect(env, session_id)
