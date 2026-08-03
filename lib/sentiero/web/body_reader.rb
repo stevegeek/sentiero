@@ -5,10 +5,11 @@ require "zlib"
 
 module Sentiero
   module Web
-    # Reads a request body (optionally gzip-encoded) with a hard 512KB cap on
-    # BOTH the compressed and decompressed size, so a gzip bomb can't blow past
-    # it. Shared by the two untrusted-input lanes (EventsApp, IngestApp), which
-    # differ only in the response they build from the error symbol.
+    # Reads a request body (optionally gzip-encoded) with a hard cap (default
+    # 512KB, config.max_body_size) on BOTH the compressed and decompressed
+    # size, so a gzip bomb can't blow past it. Shared by the two
+    # untrusted-input lanes (EventsApp, IngestApp), which differ only in the
+    # response they build from the error symbol.
     module BodyReader
       MAX_BODY_SIZE = 524_288 # 512 KB
 
@@ -21,20 +22,20 @@ module Sentiero
       module_function
 
       # [body, nil] on success, or [nil, :too_large | :bad_gzip] on failure.
-      def read(env)
-        raw = env["rack.input"].read(MAX_BODY_SIZE + 1) || ""
+      def read(env, max_bytes: MAX_BODY_SIZE)
+        raw = env["rack.input"].read(max_bytes + 1) || ""
         env["rack.input"].rewind if env["rack.input"].respond_to?(:rewind)
-        return [nil, :too_large] if raw.bytesize > MAX_BODY_SIZE
+        return [nil, :too_large] if raw.bytesize > max_bytes
 
         if gzip?(env, raw)
           begin
             gz = Zlib::GzipReader.new(StringIO.new(raw))
-            raw = gz.read(MAX_BODY_SIZE + 1) || ""
+            raw = gz.read(max_bytes + 1) || ""
             gz.close
           rescue Zlib::GzipFile::Error
             return [nil, :bad_gzip]
           end
-          return [nil, :too_large] if raw.bytesize > MAX_BODY_SIZE
+          return [nil, :too_large] if raw.bytesize > max_bytes
         end
 
         [raw, nil]

@@ -105,6 +105,31 @@ module Sentiero
         assert_includes body["error"], "too large"
       end
 
+      def test_post_body_over_a_lowered_max_body_size_returns_413
+        Sentiero.configuration.max_body_size = 50
+
+        post "/", JSON.generate(valid_payload), {"CONTENT_TYPE" => "application/json"}
+
+        assert_equal 413, last_response.status
+      end
+
+      def test_post_body_over_default_cap_accepted_with_raised_max_body_size
+        Sentiero.configuration.max_body_size = 2_000_000
+        big = valid_payload.merge("events" => [{"type" => 3, "timestamp" => 1000, "data" => "x" * 600_000}])
+
+        post "/", JSON.generate(big), {"CONTENT_TYPE" => "application/json"}
+
+        assert_equal 200, last_response.status
+      end
+
+      def test_post_gunzipped_body_over_a_lowered_max_body_size_returns_413
+        Sentiero.configuration.max_body_size = 50
+
+        post "/", gzip_compress(JSON.generate(valid_payload)), {"CONTENT_TYPE" => "text/plain"}
+
+        assert_equal 413, last_response.status
+      end
+
       def test_post_invalid_json_returns_400
         post "/", "not-json{{{", {"CONTENT_TYPE" => "application/json"}
 

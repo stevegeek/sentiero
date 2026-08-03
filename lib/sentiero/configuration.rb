@@ -14,6 +14,9 @@ module Sentiero
       :flush_event_threshold,
       :max_events_per_page,
       :max_events_per_request,
+      # Byte cap on ingest request bodies, enforced on both the raw and the
+      # gunzipped size. Dense DOMs can produce FullSnapshots past the default.
+      :max_body_size,
       :max_sessions,
       :max_events_per_session,
       :max_problems,
@@ -130,6 +133,7 @@ module Sentiero
       @flush_interval_ms = 10_000
       @flush_event_threshold = 50
       @max_events_per_page = 1_000
+      @max_body_size = 524_288
       @max_problems = 5_000
       @max_server_events = 50_000
       @ingest_keys = {}
