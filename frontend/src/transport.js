@@ -161,10 +161,8 @@ export class Transport {
           this._retryCount = 0;
           this._lastFailureTime = null;
           if (this._batchCap) {
-            // AIMD-style recovery: double on success so one transient 413
-            // doesn't degrade batching for the rest of the page's life;
-            // clear once the cap no longer constrains what the buffer can
-            // hold. Then drain the remainder a capped flush left behind.
+            // Double on success so a transient 413 doesn't cap batching for
+            // the rest of the page's life.
             this._batchCap = this._batchCap >= this.maxBufferSize ? null : this._batchCap * 2;
             if (this.buffer.length > 0) this._resendAfterSplit();
           }
@@ -182,21 +180,18 @@ export class Transport {
     }
   }
 
-  // A 413 can never succeed on an identical retry, so a multi-event batch is
-  // halved and resent immediately (bounded: log2 requests, no backoff). A
-  // single event still over the cap (typically a FullSnapshot of a dense DOM)
-  // is dropped — but through the normal failure counters, so a *persistent*
-  // 413 (an intermediary with a lower limit than config.max_body_size, or a
-  // misconfigured cap) is throttled by backoff instead of draining the buffer
-  // one doomed request per round-trip.
+  // A 413 never succeeds on an identical retry, so a multi-event batch is
+  // halved and resent without backoff (bounded: log2 requests). The
+  // single-event drop goes through the normal failure counters so a
+  // persistent 413 (e.g. an intermediary with a lower limit than
+  // config.max_body_size) backs off instead of draining the buffer one
+  // doomed request per round-trip.
   _handleOversizedPayload(events, customMetadata, payloadBytes) {
     if (events.length === 1) {
       console.warn(
         `[Sentiero] dropping event: ${payloadBytes} bytes uncompressed exceeds the server body cap; ` +
           "raise config.max_body_size if payloads this large are expected"
       );
-      // The dropped event carried the session metadata; let it ride the next
-      // successful flush instead of dying here.
       this._customMetadata = { ...customMetadata, ...this._customMetadata };
       this._metadataSent = false;
       this._retryCount++;
@@ -210,10 +205,8 @@ export class Transport {
     this._resendAfterSplit();
   }
 
-  // Once the page is hidden the browser may cancel plain fetches, and the
-  // pagehide/visibilitychange handlers have already beaconed the buffer — so
-  // a late 413 resend routes through the beacon lane (which has its own
-  // size-based chunking) instead of firing a doomed fetch.
+  // Browsers may cancel plain fetches once the page is hidden, so a late 413
+  // resend goes out via the beacon lane instead.
   _resendAfterSplit() {
     if (typeof document !== "undefined" && document.visibilityState === "hidden") {
       this.flushBeacon();
