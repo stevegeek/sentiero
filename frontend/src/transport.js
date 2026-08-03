@@ -22,6 +22,7 @@ export class Transport {
     this._baseBackoffMs = 1000;
     this._maxBackoffMs = 30_000;
     this._lastFailureTime = null;
+    this._batchCap = null;
     this._captureMetadata = captureMetadata;
     this._metadataSent = false;
     this._customMetadata = {};
@@ -128,8 +129,14 @@ export class Transport {
       return;
     }
 
-    const events = this.buffer;
-    this.buffer = [];
+    let events;
+    if (this._batchCap && this.buffer.length > this._batchCap) {
+      events = this.buffer.slice(0, this._batchCap);
+      this.buffer = this.buffer.slice(this._batchCap);
+    } else {
+      events = this.buffer;
+      this.buffer = [];
+    }
     const customMetadata = this._customMetadata;
     this._customMetadata = {};
     this._flushing = true;
@@ -152,6 +159,10 @@ export class Transport {
         if (response.ok) {
           this._retryCount = 0;
           this._lastFailureTime = null;
+          // Drain the remainder a capped flush left behind.
+          if (this._batchCap && this.buffer.length > 0) this.flush();
+        } else if (response.status === 413) {
+          this._handleOversizedPayload(events, customMetadata, payload.length);
         } else {
           this._handleFlushFailure(events, customMetadata, "[Sentiero] server rejected events:", response.status);
         }
@@ -162,6 +173,27 @@ export class Transport {
     } catch (err) {
       this._handleFlushFailure(events, customMetadata, "[Sentiero] compression failed, re-queuing events:", err);
     }
+  }
+
+  // A 413 can never succeed on retry (the payload doesn't shrink), so it
+  // bypasses the retry/backoff path: halve the batch size and resend
+  // immediately, keeping the learned cap for future flushes. A single event
+  // over the cap (typically a FullSnapshot of a dense DOM) is dropped with a
+  // warning pointing at the server-side knob.
+  _handleOversizedPayload(events, customMetadata, payloadBytes) {
+    if (events.length === 1) {
+      console.warn(
+        `[Sentiero] dropping event: ${payloadBytes} bytes uncompressed exceeds the server body cap; ` +
+          "raise config.max_body_size if payloads this large are expected"
+      );
+      if (this.buffer.length > 0) this.flush();
+      return;
+    }
+    this._batchCap = Math.max(1, Math.floor(events.length / 2));
+    this.buffer = events.concat(this.buffer);
+    this._customMetadata = { ...customMetadata, ...this._customMetadata };
+    this._metadataSent = false;
+    this.flush();
   }
 
   flushBeacon() {
