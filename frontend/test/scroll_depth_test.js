@@ -90,3 +90,14 @@ test("computeScrollDepth never emits a misleading percent field", () => {
   const depth = computeScrollDepth([scroll(2500), meta(1280, 800)]);
   assert.equal("percent" in depth, false);
 });
+
+test("computeScrollDepth rounds sub-pixel scroll offsets to whole pixels", () => {
+  assert.deepEqual(computeScrollDepth([scroll(1572.6221923828125), meta(1280, 800)]), {
+    y: 1573,
+    viewports: 3,
+  });
+});
+
+test("computeScrollDepth treats a sub-half-pixel scroll as no scroll", () => {
+  assert.equal(computeScrollDepth([scroll(0.3), meta(1280, 800)]), null);
+});
