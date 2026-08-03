@@ -6,7 +6,8 @@ module Sentiero
   module Web
     module Views
       class SessionsIndexView < BaseView
-        def initialize(sessions:, page:, per_page:, has_next:, search:, sort_by:, since:, until_param:, has_errors:)
+        def initialize(sessions:, page:, per_page:, has_next:, search:, sort_by:, since:, until_param:, has_errors:,
+          min_duration: "", min_events: "")
           super()
           @sessions = sessions
           @page = page
@@ -17,9 +18,12 @@ module Sentiero
           @since = since
           @until_param = until_param
           @has_errors = has_errors
+          @min_duration = min_duration
+          @min_events = min_events
         end
 
-        attr_reader :sessions, :page, :per_page, :has_next, :search, :sort_by, :since, :until_param, :has_errors
+        attr_reader :sessions, :page, :per_page, :has_next, :search, :sort_by, :since, :until_param, :has_errors,
+          :min_duration, :min_events
 
         def template = "sessions_index.html.erb"
       end
