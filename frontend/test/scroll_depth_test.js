@@ -97,3 +97,7 @@ test("computeScrollDepth rounds sub-pixel scroll offsets to whole pixels", () =>
     viewports: 3,
   });
 });
+
+test("computeScrollDepth treats a sub-half-pixel scroll as no scroll", () => {
+  assert.equal(computeScrollDepth([scroll(0.3), meta(1280, 800)]), null);
+});
