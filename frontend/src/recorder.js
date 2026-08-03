@@ -1,4 +1,4 @@
-import { record } from "rrweb";
+import { record } from "@rrweb/record";
 import { mergePrivacyDefaults } from "./privacy.js";
 import { Transport } from "./transport.js";
 import { optOut, optIn } from "./opt_out.js";
