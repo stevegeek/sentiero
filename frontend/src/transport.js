@@ -144,7 +144,8 @@ export class Transport {
     const payload = this._buildPayload(events, customMetadata);
 
     try {
-      const compressed = gzipSync(new TextEncoder().encode(payload));
+      const encoded = new TextEncoder().encode(payload);
+      const compressed = gzipSync(encoded);
 
       fetch(this.eventsUrl, {
         method: "POST",
@@ -159,10 +160,16 @@ export class Transport {
         if (response.ok) {
           this._retryCount = 0;
           this._lastFailureTime = null;
-          // Drain the remainder a capped flush left behind.
-          if (this._batchCap && this.buffer.length > 0) this.flush();
+          if (this._batchCap) {
+            // AIMD-style recovery: double on success so one transient 413
+            // doesn't degrade batching for the rest of the page's life;
+            // clear once the cap no longer constrains what the buffer can
+            // hold. Then drain the remainder a capped flush left behind.
+            this._batchCap = this._batchCap >= this.maxBufferSize ? null : this._batchCap * 2;
+            if (this.buffer.length > 0) this._resendAfterSplit();
+          }
         } else if (response.status === 413) {
-          this._handleOversizedPayload(events, customMetadata, payload.length);
+          this._handleOversizedPayload(events, customMetadata, encoded.length);
         } else {
           this._handleFlushFailure(events, customMetadata, "[Sentiero] server rejected events:", response.status);
         }
@@ -175,25 +182,44 @@ export class Transport {
     }
   }
 
-  // A 413 can never succeed on retry (the payload doesn't shrink), so it
-  // bypasses the retry/backoff path: halve the batch size and resend
-  // immediately, keeping the learned cap for future flushes. A single event
-  // over the cap (typically a FullSnapshot of a dense DOM) is dropped with a
-  // warning pointing at the server-side knob.
+  // A 413 can never succeed on an identical retry, so a multi-event batch is
+  // halved and resent immediately (bounded: log2 requests, no backoff). A
+  // single event still over the cap (typically a FullSnapshot of a dense DOM)
+  // is dropped — but through the normal failure counters, so a *persistent*
+  // 413 (an intermediary with a lower limit than config.max_body_size, or a
+  // misconfigured cap) is throttled by backoff instead of draining the buffer
+  // one doomed request per round-trip.
   _handleOversizedPayload(events, customMetadata, payloadBytes) {
     if (events.length === 1) {
       console.warn(
         `[Sentiero] dropping event: ${payloadBytes} bytes uncompressed exceeds the server body cap; ` +
           "raise config.max_body_size if payloads this large are expected"
       );
-      if (this.buffer.length > 0) this.flush();
+      // The dropped event carried the session metadata; let it ride the next
+      // successful flush instead of dying here.
+      this._customMetadata = { ...customMetadata, ...this._customMetadata };
+      this._metadataSent = false;
+      this._retryCount++;
+      this._lastFailureTime = Date.now();
       return;
     }
     this._batchCap = Math.max(1, Math.floor(events.length / 2));
     this.buffer = events.concat(this.buffer);
     this._customMetadata = { ...customMetadata, ...this._customMetadata };
     this._metadataSent = false;
-    this.flush();
+    this._resendAfterSplit();
+  }
+
+  // Once the page is hidden the browser may cancel plain fetches, and the
+  // pagehide/visibilitychange handlers have already beaconed the buffer — so
+  // a late 413 resend routes through the beacon lane (which has its own
+  // size-based chunking) instead of firing a doomed fetch.
+  _resendAfterSplit() {
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      this.flushBeacon();
+    } else {
+      this.flush();
+    }
   }
 
   flushBeacon() {
