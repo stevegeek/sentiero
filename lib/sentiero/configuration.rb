@@ -14,9 +14,6 @@ module Sentiero
       :flush_event_threshold,
       :max_events_per_page,
       :max_events_per_request,
-      # Byte cap on ingest request bodies, enforced on both the raw and the
-      # gunzipped size. Dense DOMs can produce FullSnapshots past the default.
-      :max_body_size,
       :max_sessions,
       :max_events_per_session,
       :max_problems,
@@ -61,6 +58,8 @@ module Sentiero
     # logic), so they're declared separately from the plain attr_accessor list.
     attr_reader :session_idle_timeout, :session_max_age
 
+    attr_reader :max_body_size
+
     # Geo headers are trivially spoofable unless actually behind the CDN, so
     # trusting them is an explicit opt-in.
     attr_reader :geo_source
@@ -74,6 +73,7 @@ module Sentiero
     # keeps the identifier from living forever on never-idle tabs.
     DEFAULT_SESSION_IDLE_TIMEOUT = 6 * 60 * 60
     DEFAULT_SESSION_MAX_AGE = 7 * 24 * 60 * 60
+    DEFAULT_MAX_BODY_SIZE = 524_288 # 512 KB
 
     # Composition root for store caps: a store assigned to the configuration is
     # bound to the configuration's caps here, so the store itself never reads
@@ -115,6 +115,16 @@ module Sentiero
       @session_max_age = clamp_positive_seconds(value, DEFAULT_SESSION_MAX_AGE)
     end
 
+    # Byte cap on ingest request bodies, enforced on both the raw and the
+    # gunzipped size; dense DOMs can produce FullSnapshots past the default.
+    # There is no "unlimited" setting — the cap is what keeps a gzip bomb
+    # bounded, and each request may allocate up to ~2x this value while
+    # reading — so nil/zero/negative/non-numeric fall back to the default
+    # rather than crash the public events endpoint per request.
+    def max_body_size=(value)
+      @max_body_size = (value.is_a?(Numeric) && value.finite? && value > 0) ? value.to_i : DEFAULT_MAX_BODY_SIZE
+    end
+
     def geo_source=(value)
       unless value.nil? || value == :cloudflare || value.respond_to?(:call)
         raise ArgumentError, "geo_source must be nil, :cloudflare, or a #call-able (env -> Hash)"
@@ -133,7 +143,7 @@ module Sentiero
       @flush_interval_ms = 10_000
       @flush_event_threshold = 50
       @max_events_per_page = 1_000
-      @max_body_size = 524_288
+      @max_body_size = DEFAULT_MAX_BODY_SIZE
       @max_problems = 5_000
       @max_server_events = 50_000
       @ingest_keys = {}
