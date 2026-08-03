@@ -2,7 +2,7 @@
 
 <form method="get" action="<%= view.h(view.base_path) %>/">
   <div class="card mb-4">
-    <div class="flex items-end gap-3 px-4 py-3">
+    <div class="flex flex-wrap items-end gap-3 px-4 py-3">
       <div class="shrink-0">
         <label for="search" class="label">Search</label>
         <input type="text" name="search" id="search" class="input" style="width:11rem" value="<%= view.h(view.search) %>" placeholder="Session ID or metadata...">
@@ -14,6 +14,14 @@
       <div class="shrink-0">
         <label for="until" class="label">To</label>
         <input type="date" name="until" id="until" class="input" style="width:8.5rem" value="<%= view.h(view.until_param) %>">
+      </div>
+      <div class="shrink-0">
+        <label for="min_duration" class="label">Min duration (s)</label>
+        <input type="number" name="min_duration" id="min_duration" class="input" style="width:7rem" min="1" value="<%= view.h(view.min_duration) %>">
+      </div>
+      <div class="shrink-0">
+        <label for="min_events" class="label">Min events</label>
+        <input type="number" name="min_events" id="min_events" class="input" style="width:6.5rem" min="1" value="<%= view.h(view.min_events) %>">
       </div>
       <div class="shrink-0">
         <label for="sort_by" class="label">Sort by</label>
@@ -39,7 +47,7 @@
 <% if view.sessions.empty? -%>
   <div class="card">
     <div class="text-center py-10 px-6 text-gray-400 text-xs">
-      <% if !view.search.empty? || !view.since.empty? || !view.until_param.empty? || view.has_errors -%>
+      <% if !view.search.empty? || !view.since.empty? || !view.until_param.empty? || view.has_errors || !view.min_duration.empty? || !view.min_events.empty? -%>
         No results match your filters. <a href="<%= view.h(view.base_path) %>/" class="text-blue-500 hover:text-blue-700">Clear filters</a>
       <% else -%>
         No sessions recorded yet.
@@ -79,10 +87,10 @@
       <nav aria-label="Session pagination">
         <ul class="pagination">
           <li class="<%= 'page-disabled' if view.page <= 1 %>">
-            <a class="page-link" href="<%= view.h(view.base_path) %>/?page=<%= view.page - 1 %>&per_page=<%= view.per_page %>&search=<%= view.h(view.search) %>&sort_by=<%= view.h(view.sort_by) %>&since=<%= view.h(view.since) %>&until=<%= view.h(view.until_param) %><%= view.has_errors ? "&has_errors=true" : "" %>">Previous</a>
+            <a class="page-link" href="<%= view.h(view.base_path) %>/?page=<%= view.page - 1 %>&per_page=<%= view.per_page %>&search=<%= view.h(view.search) %>&sort_by=<%= view.h(view.sort_by) %>&since=<%= view.h(view.since) %>&until=<%= view.h(view.until_param) %><%= view.has_errors ? "&has_errors=true" : "" %><%= view.min_duration.empty? ? "" : "&min_duration=#{view.h(view.min_duration)}" %><%= view.min_events.empty? ? "" : "&min_events=#{view.h(view.min_events)}" %>">Previous</a>
           </li>
           <li class="<%= 'page-disabled' unless view.has_next %>">
-            <a class="page-link" href="<%= view.h(view.base_path) %>/?page=<%= view.page + 1 %>&per_page=<%= view.per_page %>&search=<%= view.h(view.search) %>&sort_by=<%= view.h(view.sort_by) %>&since=<%= view.h(view.since) %>&until=<%= view.h(view.until_param) %><%= view.has_errors ? "&has_errors=true" : "" %>">Next</a>
+            <a class="page-link" href="<%= view.h(view.base_path) %>/?page=<%= view.page + 1 %>&per_page=<%= view.per_page %>&search=<%= view.h(view.search) %>&sort_by=<%= view.h(view.sort_by) %>&since=<%= view.h(view.since) %>&until=<%= view.h(view.until_param) %><%= view.has_errors ? "&has_errors=true" : "" %><%= view.min_duration.empty? ? "" : "&min_duration=#{view.h(view.min_duration)}" %><%= view.min_events.empty? ? "" : "&min_events=#{view.h(view.min_events)}" %>">Next</a>
           </li>
         </ul>
       </nav>

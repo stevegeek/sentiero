@@ -7,3 +7,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [1.0.0.beta1] - ?
 
 Initial release.
+
+Changes since 1.0.0.alpha1:
+
+- The sessions dashboard can filter by minimum session duration and minimum
+  event count. `SessionStore#list_sessions` gains `min_duration_ms:` and
+  `min_events:` keywords — custom store implementations must accept them.

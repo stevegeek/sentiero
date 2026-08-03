@@ -190,13 +190,17 @@ module Sentiero
         counts
       end
 
-      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil)
+      def list_sessions(limit:, offset: 0, since: nil, until_time: nil, sort_by: nil, search: nil,
+        min_duration_ms: nil, min_events: nil)
         where = Where.new
         where.add("s.updated_at >= ?", since.to_f) if since
         where.add("s.updated_at <= ?", until_time.to_f) if until_time
         if search && !search.empty?
           pattern = "%#{search}%"
           where.add("(s.session_id LIKE ? OR COALESCE(s.metadata, '') LIKE ?)", pattern, pattern)
+        end
+        if min_duration_ms
+          where.add("s.first_event_at IS NOT NULL AND (s.last_event_at - s.first_event_at) >= ?", min_duration_ms)
         end
 
         order_clause = case sort_by
@@ -208,6 +212,7 @@ module Sentiero
           "ORDER BY s.updated_at DESC"
         end
 
+        having = min_events ? "HAVING COUNT(e.id) >= ?" : ""
         sql = <<~SQL
           SELECT s.session_id, s.created_at, s.updated_at, s.first_event_at, s.last_event_at, s.metadata,
                  COUNT(e.id) AS event_count
@@ -215,11 +220,14 @@ module Sentiero
           LEFT JOIN events e ON e.session_id = s.session_id
           #{where.clause}
           GROUP BY s.id
+          #{having}
           #{order_clause}
           LIMIT ? OFFSET ?
         SQL
 
-        rows = db.execute(sql, where.params + [limit, offset])
+        params = where.params
+        params += [min_events] if min_events
+        rows = db.execute(sql, params + [limit, offset])
 
         rows.map { |row|
           window_ids = db.execute(

@@ -776,6 +776,60 @@ module Sentiero
         assert_includes last_response.body, "sess-abc2"
       end
 
+      # --- min duration / min events filters ---
+      # Seed data: sess-abc1 has 4 events spanning 1000ms, sess-abc2 has 1
+      # event (zero duration).
+
+      def test_index_min_events_filters_sessions
+        get "/?min_events=2"
+
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, "sess-abc1"
+        refute_includes last_response.body, "sess-abc2"
+      end
+
+      def test_index_min_duration_filters_sessions
+        get "/?min_duration=1"
+
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, "sess-abc1"
+        refute_includes last_response.body, "sess-abc2"
+      end
+
+      def test_index_min_filters_ignore_invalid_values
+        get "/?min_events=abc&min_duration=-5"
+
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, "sess-abc1"
+        assert_includes last_response.body, "sess-abc2"
+      end
+
+      def test_index_min_events_filter_combined_with_has_errors
+        @store.save_metadata("sess-abc1", {"has_errors" => true})
+        @store.save_metadata("sess-abc2", {"has_errors" => true})
+
+        get "/?has_errors=true&min_events=2"
+
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, "sess-abc1"
+        refute_includes last_response.body, "sess-abc2"
+      end
+
+      def test_index_min_filter_values_persist_in_form
+        get "/?min_duration=10&min_events=5"
+
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, %(name="min_duration" id="min_duration" class="input" style="width:7rem" min="1" value="10")
+        assert_includes last_response.body, %(name="min_events" id="min_events" class="input" style="width:6.5rem" min="1" value="5")
+      end
+
+      def test_index_min_filters_show_clear_filters_empty_state
+        get "/?min_events=99"
+
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, "No results match your filters"
+      end
+
       private
 
       def set_csrf_cookie
