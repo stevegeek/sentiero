@@ -26,4 +26,25 @@ class ConfigurationTest < Minitest::Test
     assert_raises(ArgumentError) { config.geo_source = :maxmind }
     assert_raises(ArgumentError) { config.geo_source = "cloudflare" }
   end
+
+  def test_max_body_size_default
+    assert_equal 524_288, Sentiero::Configuration.new.max_body_size
+  end
+
+  def test_max_body_size_accepts_a_positive_integer
+    config = Sentiero::Configuration.new
+    config.max_body_size = 2_000_000
+    assert_equal 2_000_000, config.max_body_size
+  end
+
+  # nil/zero/negative/non-numeric would crash BodyReader (or silently reject
+  # every request) on the public events endpoint, so bad values fall back to
+  # the default like the session rotation writers do.
+  def test_max_body_size_falls_back_to_default_for_invalid_values
+    [nil, 0, -5, "500", Float::INFINITY].each do |bad|
+      config = Sentiero::Configuration.new
+      config.max_body_size = bad
+      assert_equal 524_288, config.max_body_size, "expected fallback for #{bad.inspect}"
+    end
+  end
 end
