@@ -398,8 +398,8 @@ module Sentiero
         scope
       end
 
-      # The aggregate join for event_count sorting and thresholds is applied
-      # once in list_sessions; this only orders.
+      # The COUNT ordering relies on the events join/group that list_sessions
+      # applies via with_event_aggregates.
       def ordered_session_scope(scope, sort_by)
         if sort_by == "event_count"
           scope.order(Arel.sql("COUNT(#{Event.table_name}.id) DESC"))
