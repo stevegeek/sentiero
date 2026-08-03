@@ -6,6 +6,7 @@ import { renderWebVitalBadges } from "./web_vitals.js";
 import { renderScrollDepthBadge } from "./scroll-depth.js";
 import { initClickOverlay } from "./click_overlay.js";
 import { detectFrustrationEvents } from "./frustration.js";
+import { installInactiveSkipper } from "./skip_inactive.js";
 
 let _playerInstance = null;
 let _loadedEvents = [];
@@ -230,6 +231,7 @@ export function initPlayer(eventsUrl, container, serverMarkers = []) {
       }
     }
 
+    installInactiveSkipper(_playerInstance, events);
     initClickOverlay();
     initKeyboardShortcuts();
   });
