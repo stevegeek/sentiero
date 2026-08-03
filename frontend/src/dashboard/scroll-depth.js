@@ -41,7 +41,7 @@ export function computeScrollDepth(events) {
   if (y <= 0) return null;
   const vh = viewportHeight(events);
   const viewports = vh && vh > 0 ? Math.round(((y + vh) / vh) * 10) / 10 : null;
-  return { y, viewports };
+  return { y: Math.round(y), viewports };
 }
 
 // Uses a "× viewport" unit, not "%", since the value is an unbounded multiple
