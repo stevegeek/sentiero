@@ -48,6 +48,7 @@ module Sentiero
 
         key = ErrorCollector.group_key(message)
         group = groups[key] ||= new_group(key, message, payload)
+        group[:stack] ||= stack_of(payload)
         group[:count] += 1
         group[:last_seen_at] = [group[:last_seen_at], timestamp].compact.max
         tally_facets(group, summary[:metadata] || {})
@@ -72,6 +73,7 @@ module Sentiero
           message: message,
           source: source_of(payload),
           line: line_of(payload),
+          stack: nil,
           count: 0,
           last_seen_at: nil,
           browsers: Hash.new(0),
@@ -103,6 +105,11 @@ module Sentiero
       def line_of(payload)
         line = payload["lineno"]
         line.is_a?(Integer) ? line : nil
+      end
+
+      def stack_of(payload)
+        stack = payload["stack"]
+        (stack.is_a?(String) && !stack.empty?) ? stack : nil
       end
 
       def sort_groups(groups, sort_by)

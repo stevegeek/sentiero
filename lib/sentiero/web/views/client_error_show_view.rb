@@ -20,7 +20,7 @@ module Sentiero
           [
             ["Browsers", group[:browsers] || {}],
             ["Devices", group[:devices] || {}],
-            ["Pages", group[:pages] || {}]
+            ["Entry pages", group[:pages] || {}]
           ]
         end
       end
