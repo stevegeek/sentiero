@@ -709,6 +709,41 @@ module Sentiero
         assert_equal 404, last_response.status
       end
 
+      def test_client_error_show_renders_stack
+        seed_client_error("err-1", "w1", {
+          "message" => "Stack boom",
+          "stack" => "at boom (https://ex.com/app.js:42:7)\nat init (https://ex.com/app.js:9:1)"
+        })
+        id = client_group_id("Stack boom")
+
+        get "/issues/client/#{id}"
+
+        body = last_response.body
+        assert_includes body, "data-client-error-stack"
+        assert_includes body, "at boom (https://ex.com/app.js:42:7)"
+      end
+
+      def test_client_error_show_omits_stack_when_absent
+        seed_client_error("err-1", "w1", {"message" => "Stackless boom"})
+        id = client_group_id("Stackless boom")
+
+        get "/issues/client/#{id}"
+
+        refute_includes last_response.body, "data-client-error-stack"
+      end
+
+      def test_client_error_show_escapes_stack
+        seed_client_error("err-1", "w1", {
+          "message" => "Xss stack boom",
+          "stack" => "at <script>alert(1)</script>"
+        })
+        id = client_group_id("Xss stack boom")
+
+        get "/issues/client/#{id}"
+
+        refute_includes last_response.body, "<script>alert(1)</script>"
+      end
+
       # ── B2: browser/device/page facets on client errors ──
 
       SAFARI_IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
@@ -725,6 +760,16 @@ module Sentiero
         assert_includes body, "Chrome"
         assert_includes body, "Desktop"
         assert_includes body, "https://ex.com/checkout"
+      end
+
+      def test_client_error_show_labels_pages_facet_as_entry_pages
+        seed_client_error("err-1", "w1", {"message" => "Entry boom"})
+        @store.save_metadata("err-1", {"url" => "https://ex.com/landing"})
+        id = client_group_id("Entry boom")
+
+        get "/issues/client/#{id}"
+
+        assert_includes last_response.body, "Entry pages"
       end
 
       def test_client_error_show_omits_facets_without_metadata

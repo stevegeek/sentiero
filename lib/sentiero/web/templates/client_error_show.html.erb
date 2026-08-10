@@ -23,6 +23,11 @@
       <div class="text-xs text-gray-600">
         <%= view.group[:last_seen_at] ? Time.at(view.group[:last_seen_at].to_f / 1000).utc.strftime("%b %d, %Y %H:%M:%S UTC") : "N/A" %>
       </div>
+
+      <% if view.group[:stack] -%>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Stack</div>
+        <pre class="text-[10px] text-gray-500 bg-gray-50 rounded p-2 overflow-x-auto whitespace-pre-wrap font-mono" data-client-error-stack><%= view.h(view.group[:stack]) %></pre>
+      <% end -%>
     </div>
   </div>
 </div>
@@ -36,7 +41,7 @@
       <% view.facet_chips.each do |title, counts| -%>
         <% next if counts.empty? -%>
         <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-          <span class="text-[10px] font-medium text-gray-400 uppercase tracking-wider w-16 shrink-0"><%= view.h(title) %></span>
+          <span class="text-[10px] font-medium text-gray-400 uppercase tracking-wider w-20 shrink-0"><%= view.h(title) %></span>
           <% counts.sort_by { |_value, count| -count }.first(8).each do |value, count| -%>
             <span class="badge badge-neutral"><%= view.h(value) %>&nbsp;<span class="tabular-nums">&times;<%= count %></span></span>
           <% end -%>

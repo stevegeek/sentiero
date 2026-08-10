@@ -90,6 +90,23 @@ module Sentiero
         assert_equal 500, occ[:offset_ms]
       end
 
+      # ── stack ──
+
+      def test_group_stack_comes_from_first_occurrence_with_one
+        seed_errors("s1", "w1", now_ms, [
+          [100, {"message" => "Boom"}],
+          [200, {"message" => "Boom", "stack" => "at boom (app.js:42:7)"}]
+        ])
+
+        assert_equal "at boom (app.js:42:7)", groups_for.first[:stack]
+      end
+
+      def test_group_stack_nil_when_no_occurrence_has_one
+        seed_errors("s1", "w1", now_ms, [[100, {"message" => "Boom"}]])
+
+        assert_nil groups_for.first[:stack]
+      end
+
       # ── grouping / dedup ──
 
       def test_identical_messages_group_together
