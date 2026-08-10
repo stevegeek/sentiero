@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0.beta3] - 2026-08-10
+
+- The client error detail page shows the recorded JavaScript stack. A group
+  keeps the first non-empty stack among its occurrences, so a masked
+  "Script error." occurrence no longer hides the informative stack from a
+  later one.
+- The client error detail page labels the pages facet "Entry pages": the
+  tallied values are session entry URLs, not the page where the error fired.
+
 ## [1.0.0.beta2] - 2026-08-03
 
 - The SQLite store compresses event payloads at rest: rrweb payloads of 1 KB
