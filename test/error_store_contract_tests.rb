@@ -520,17 +520,25 @@ module ErrorStoreContractTests
     end
   end
 
-  def test_purge_client_error_states_drops_rows_older_than_cutoff
+  def test_purge_client_error_states_drops_resolved_rows_older_than_cutoff
     @store.set_client_error_state("ce_old", status: "resolved", changed_at: 100.0, last_seen_at: nil)
     @store.set_client_error_state("ce_new", status: "resolved", changed_at: 300.0, last_seen_at: nil)
     @store.purge_client_error_states(200.0)
     assert_equal ["ce_new"], @store.client_error_states(["ce_old", "ce_new"]).keys
   end
 
-  def test_purge_older_than_drops_stale_client_error_states
+  def test_purge_client_error_states_keeps_ignored_rows_older_than_cutoff
+    @store.set_client_error_state("ce_ign", status: "ignored", changed_at: 100.0, last_seen_at: nil)
+    @store.set_client_error_state("ce_res", status: "resolved", changed_at: 100.0, last_seen_at: nil)
+    @store.purge_client_error_states(200.0)
+    assert_equal ["ce_ign"], @store.client_error_states(["ce_ign", "ce_res"]).keys
+  end
+
+  def test_purge_older_than_drops_stale_resolved_client_error_states_only
     @store.set_client_error_state("ce_stale", status: "resolved", changed_at: 1.0, last_seen_at: nil)
+    @store.set_client_error_state("ce_stale_ign", status: "ignored", changed_at: 1.0, last_seen_at: nil)
     @store.set_client_error_state("ce_fresh", status: "resolved", changed_at: ::Time.now.to_f, last_seen_at: nil)
     @store.purge_older_than(60)
-    assert_equal ["ce_fresh"], @store.client_error_states(["ce_stale", "ce_fresh"]).keys
+    assert_equal ["ce_fresh", "ce_stale_ign"], @store.client_error_states(["ce_stale", "ce_stale_ign", "ce_fresh"]).keys.sort
   end
 end

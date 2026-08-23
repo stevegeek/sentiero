@@ -428,7 +428,8 @@ module Sentiero
 
       def purge_client_error_states(cutoff)
         @redis.hscan_each(@keys.client_error_states) do |id, json|
-          @redis.hdel(@keys.client_error_states, id) if JSON.parse(json)["changed_at"].to_f < cutoff.to_f
+          state = JSON.parse(json)
+          @redis.hdel(@keys.client_error_states, id) if state["status"] == "resolved" && state["changed_at"].to_f < cutoff.to_f
         end
         nil
       end

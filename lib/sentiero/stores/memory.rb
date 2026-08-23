@@ -278,7 +278,7 @@ module Sentiero
 
       def purge_client_error_states(cutoff)
         @client_error_states.each_pair do |id, state|
-          @client_error_states.delete(id) if state[:changed_at] < cutoff.to_f
+          @client_error_states.delete(id) if state[:status] == "resolved" && state[:changed_at] < cutoff.to_f
         end
         nil
       end

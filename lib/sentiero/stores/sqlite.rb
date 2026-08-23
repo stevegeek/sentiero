@@ -531,7 +531,7 @@ module Sentiero
       end
 
       def purge_client_error_states(cutoff)
-        db.execute("DELETE FROM client_error_states WHERE changed_at < ?", [cutoff.to_f])
+        db.execute("DELETE FROM client_error_states WHERE status = 'resolved' AND changed_at < ?", [cutoff.to_f])
         nil
       end
 
@@ -566,7 +566,7 @@ module Sentiero
             [cutoff]
           )
           db.execute("DELETE FROM problems WHERE last_seen < ?", [cutoff])
-          db.execute("DELETE FROM client_error_states WHERE changed_at < ?", [cutoff])
+          db.execute("DELETE FROM client_error_states WHERE status = 'resolved' AND changed_at < ?", [cutoff])
         end
 
         session_count
