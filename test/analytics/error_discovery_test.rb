@@ -353,6 +353,78 @@ module Sentiero
         assert_empty out_of_window
         assert_equal ["Boom"], messages(in_window)
       end
+
+      # ── status (resolve / ignore / regression) ──
+
+      def group_id(message)
+        Digest::SHA1.hexdigest(ErrorCollector.group_key(message))
+      end
+
+      def groups_with_status(status)
+        ErrorDiscovery.new(@store).grouped_errors(status: status)[:groups]
+      end
+
+      def test_untouched_group_is_open_with_nil_state
+        seed_errors("s1", "w1", now_ms, [[100, {"message" => "Boom"}]])
+
+        group = groups_for.first
+        assert_equal "open", group[:status]
+        assert_nil group[:state]
+      end
+
+      def test_resolved_group_with_no_newer_occurrence_is_resolved
+        seed_errors("s1", "w1", now_ms, [[100, {"message" => "Boom"}]])
+        @store.set_client_error_state(group_id("Boom"), status: "resolved", changed_at: Time.now.to_f, last_seen_at: now_ms + 100)
+
+        group = groups_with_status("resolved").first
+        assert_equal "resolved", group[:status]
+        assert_equal "resolved", group[:state][:status]
+        assert_equal 0, group[:regressions]
+      end
+
+      def test_resolved_group_seen_again_after_watermark_is_regressed
+        seed_errors("s1", "w1", now_ms, [[100, {"message" => "Boom"}]])
+        @store.set_client_error_state(group_id("Boom"), status: "resolved", changed_at: Time.now.to_f, last_seen_at: now_ms + 100)
+        seed_errors("s2", "w1", now_ms + 1000, [[100, {"message" => "Boom"}], [200, {"message" => "Boom"}]])
+
+        group = groups_for.first
+        assert_equal "regressed", group[:status]
+        assert_equal 2, group[:regressions]
+      end
+
+      def test_ignored_group_stays_ignored_when_it_recurs
+        seed_errors("s1", "w1", now_ms, [[100, {"message" => "Boom"}]])
+        @store.set_client_error_state(group_id("Boom"), status: "ignored", changed_at: Time.now.to_f, last_seen_at: now_ms + 100)
+        seed_errors("s2", "w1", now_ms + 1000, [[100, {"message" => "Boom"}]])
+
+        assert_empty groups_for
+        assert_equal "ignored", groups_with_status("ignored").first[:status]
+      end
+
+      def test_default_listing_excludes_resolved_and_ignored
+        seed_errors("s1", "w1", now_ms, [
+          [100, {"message" => "Open one"}],
+          [200, {"message" => "Resolved one"}],
+          [300, {"message" => "Ignored one"}]
+        ])
+        @store.set_client_error_state(group_id("Resolved one"), status: "resolved", changed_at: Time.now.to_f, last_seen_at: now_ms + 200)
+        @store.set_client_error_state(group_id("Ignored one"), status: "ignored", changed_at: Time.now.to_f, last_seen_at: now_ms + 300)
+
+        assert_equal ["Open one"], messages(groups_for)
+        assert_equal ["Open one"], messages(groups_with_status("open"))
+        assert_equal ["Resolved one"], messages(groups_with_status("resolved"))
+        assert_equal ["Ignored one"], messages(groups_with_status("ignored"))
+        assert_equal ["Ignored one", "Open one", "Resolved one"], messages(groups_with_status("all")).sort
+      end
+
+      def test_open_filter_includes_regressed_groups
+        seed_errors("s1", "w1", now_ms, [[100, {"message" => "Boom"}]])
+        @store.set_client_error_state(group_id("Boom"), status: "resolved", changed_at: Time.now.to_f, last_seen_at: now_ms + 100)
+        seed_errors("s2", "w1", now_ms + 1000, [[100, {"message" => "Boom"}]])
+
+        assert_equal ["Boom"], messages(groups_with_status("open"))
+        assert_empty groups_with_status("resolved")
+      end
     end
   end
 end

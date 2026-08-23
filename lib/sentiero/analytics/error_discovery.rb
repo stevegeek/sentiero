@@ -16,20 +16,47 @@ module Sentiero
 
       MAX_FACET_VALUES = 50
 
-      def grouped_errors(sort_by: "count", since: nil, until_time: nil)
+      STATUS_FILTERS = %w[open resolved ignored all].freeze
+
+      # status: nil (= "open", which includes regressed) | "open" | "resolved" |
+      # "ignored" | "all". Each group carries :status (effective, see
+      # #effective_status), :state (the stored row or nil) and :regressions
+      # (occurrences newer than the resolve watermark).
+      def grouped_errors(sort_by: "count", since: nil, until_time: nil, status: nil)
         groups = {}
 
         _scanned, hit_cap = scan_sessions(since: since, until_time: until_time, types: [META, CUSTOM]) do |summary, window_id, events|
           collect_window(groups, summary, window_id, events)
         end
 
+        groups.each_value { |group| group[:status] = effective_status(group) }
+
         {
-          groups: sort_groups(groups.values, sort_by),
+          groups: sort_groups(filter_by_status(groups.values, status), sort_by),
           was_truncated: hit_cap
         }
       end
 
       private
+
+      # Absent row = open. Ignored never reopens. A resolved group seen again
+      # after its watermark is "regressed", a display flavour of open.
+      def effective_status(group)
+        state = group[:state]
+        return "open" if state.nil?
+        return "ignored" if state[:status] == "ignored"
+        return "regressed" if group[:regressions].positive?
+
+        "resolved"
+      end
+
+      def filter_by_status(groups, status)
+        case status
+        when "all" then groups
+        when "resolved", "ignored" then groups.select { |g| g[:status] == status }
+        else groups.select { |g| %w[open regressed].include?(g[:status]) }
+        end
+      end
 
       def collect_window(groups, summary, window_id, events)
         anchor = window_anchor(summary, window_id, events)
@@ -51,6 +78,7 @@ module Sentiero
         group[:stack] ||= stack_of(payload)
         group[:count] += 1
         group[:last_seen_at] = [group[:last_seen_at], timestamp].compact.max
+        group[:regressions] += 1 if regression?(group[:state], timestamp)
         tally_facets(group, summary[:metadata] || {})
         return if group[:occurrences].size >= MAX_OCCURRENCES_PER_GROUP
 
@@ -67,15 +95,24 @@ module Sentiero
         payload.is_a?(Hash) ? payload : {}
       end
 
+      # Occurrences newer than a resolved state's watermark count as regressions.
+      def regression?(state, timestamp)
+        state && state[:status] == "resolved" && timestamp && timestamp.to_f > state[:last_seen_at].to_f
+      end
+
       def new_group(key, message, payload)
+        id = Digest::SHA1.hexdigest(key)
         {
-          id: Digest::SHA1.hexdigest(key),
+          id: id,
           message: message,
           source: source_of(payload),
           line: line_of(payload),
           stack: nil,
           count: 0,
           last_seen_at: nil,
+          state: @store.client_error_states([id])[id],
+          status: nil,
+          regressions: 0,
           browsers: Hash.new(0),
           devices: Hash.new(0),
           pages: Hash.new(0),
