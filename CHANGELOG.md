@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Client-side JS error groups can be marked Resolved or Ignored from the
+  errors list and the detail page, with a Reopen action and a Status filter
+  (Open, Resolved, Ignored, All; Open is the default). A resolved group that
+  fires again after it was resolved shows as open with a "regressed" badge
+  and the count of new occurrences. Ignored groups stay hidden while they
+  recur and are exempt from the retention purge; resolved rows are purged
+  with the retention cutoff. Every store backend gains
+  `client_error_states`, `set_client_error_state` and
+  `purge_client_error_states`. Rails installs get a new
+  `sentiero_client_error_states` migration: re-run `rails g sentiero:install`
+  to pick it up.
+- The errors CSV export includes resolved and ignored client groups.
+- Recorder: `focus`/`blur` events whose target is `document`, and clicks on
+  text nodes, no longer throw `target.closest is not a function` in the
+  navigation and custom-event trackers.
+- Replay page: following playback scrolls only the activity sidebar, not the
+  page. On narrow layouts where the sidebar sits below the player, each new
+  event used to scroll the viewport away from the replay.
+
 ## [1.0.0.beta3] - 2026-08-10
 
 - The client error detail page shows the recorded JavaScript stack. A group
