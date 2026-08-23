@@ -14,6 +14,7 @@ class Sentiero::Rails::StoreTest < Minitest::Test
     Sentiero::Rails::Problem.delete_all
     Sentiero::Rails::Occurrence.delete_all
     Sentiero::Rails::ServerEvent.delete_all
+    Sentiero::Rails::ClientErrorState.delete_all
     Sentiero.reset_configuration!
     Sentiero::Rails::Store.new
   end

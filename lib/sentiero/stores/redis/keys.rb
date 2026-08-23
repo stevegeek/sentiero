@@ -50,6 +50,10 @@ module Sentiero
           @server_events ||= "#{@prefix}server_events"
         end
 
+        def client_error_states
+          @client_error_states ||= "#{@prefix}client_error_states"
+        end
+
         def server_events_project(project)
           "#{@prefix}server_events:project:#{project}"
         end

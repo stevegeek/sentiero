@@ -15,6 +15,7 @@ module Sentiero
         @problems = Concurrent::Map.new # fingerprint => problem Hash (symbol-keyed)
         @occurrences = Concurrent::Map.new # fingerprint => Concurrent::Array of occurrence Hashes
         @server_events = Concurrent::Array.new
+        @client_error_states = Concurrent::Map.new # group id => state Hash (symbol-keyed)
       end
 
       def save_events(ref, events)
@@ -260,9 +261,33 @@ module Sentiero
         latest_session_ids(list.to_a, limit: limit)
       end
 
+      def client_error_states(ids)
+        select_client_error_states(@client_error_states, ids)
+      end
+
+      def set_client_error_state(id, status:, changed_at:, last_seen_at:)
+        validate_id!(id)
+        validate_status!(status)
+        if status == "open"
+          @client_error_states.delete(id)
+        else
+          @client_error_states[id] = client_error_state_attrs(status, changed_at, last_seen_at)
+        end
+        nil
+      end
+
+      def purge_client_error_states(cutoff)
+        @client_error_states.each_pair do |id, state|
+          @client_error_states.delete(id) if state[:changed_at] < cutoff.to_f
+        end
+        nil
+      end
+
       def purge_older_than(seconds)
         deleted = super
-        purge_error_collections!(@problems, @occurrences, @server_events, Time.now.to_f - seconds)
+        cutoff = Time.now.to_f - seconds
+        purge_error_collections!(@problems, @occurrences, @server_events, cutoff)
+        purge_client_error_states(cutoff)
         deleted
       end
 
@@ -271,6 +296,7 @@ module Sentiero
         @problems.clear
         @occurrences.clear
         @server_events.clear
+        @client_error_states.clear
         nil
       end
 

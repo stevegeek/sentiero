@@ -1,0 +1,16 @@
+class CreateSentieroClientErrorStates < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+  def change
+    create_table :sentiero_client_error_states do |t|
+      t.string :group_id, null: false
+      t.string :status, null: false
+      t.float :changed_at, null: false
+      t.float :last_seen_at
+    end
+
+    add_index :sentiero_client_error_states, :group_id, unique: true
+    add_index :sentiero_client_error_states, :changed_at
+
+    add_check_constraint :sentiero_client_error_states, "status IN ('open', 'resolved', 'ignored')",
+      name: "sentiero_client_error_states_status_check"
+  end
+end

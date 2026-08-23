@@ -6,6 +6,7 @@ require_relative "models/event"
 require_relative "models/problem"
 require_relative "models/occurrence"
 require_relative "models/server_event"
+require_relative "models/client_error_state"
 
 module Sentiero
   module Rails
@@ -197,6 +198,7 @@ module Sentiero
             Occurrence.where(fingerprint: stale_fps).delete_all
             Problem.where(fingerprint: stale_fps).delete_all
           end
+          ClientErrorState.where("changed_at < ?", cutoff_f).delete_all
         end
 
         session_count
@@ -312,6 +314,36 @@ module Sentiero
         validate_status!(status)
         resolved_at = (status == "resolved") ? Time.now.to_f : nil
         Problem.where(fingerprint: problem_id).update_all(status: status, resolved_at: resolved_at)
+        nil
+      end
+
+      def client_error_states(ids)
+        return {} if ids.empty?
+
+        ClientErrorState.where(group_id: ids).each_with_object({}) do |state, out|
+          out[state.group_id] = {status: state.status, changed_at: state.changed_at, last_seen_at: state.last_seen_at}
+        end
+      end
+
+      def set_client_error_state(id, status:, changed_at:, last_seen_at:)
+        validate_id!(id)
+        validate_status!(status)
+        if status == "open"
+          ClientErrorState.where(group_id: id).delete_all
+        else
+          ClientErrorState.transaction do
+            state = ClientErrorState.lock.find_or_initialize_by(group_id: id)
+            state.status = status
+            state.changed_at = changed_at.to_f
+            state.last_seen_at = last_seen_at&.to_f
+            state.save!
+          end
+        end
+        nil
+      end
+
+      def purge_client_error_states(cutoff)
+        ClientErrorState.where("changed_at < ?", cutoff.to_f).delete_all
         nil
       end
 

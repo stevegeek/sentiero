@@ -27,6 +27,18 @@ class Sentiero::Generators::InstallGeneratorTest < ::Rails::Generators::TestCase
     end
   end
 
+  test "creates client error states migration file" do
+    run_generator
+
+    assert_migration "db/migrate/create_sentiero_client_error_states.rb" do |migration|
+      assert_match(/create_table :sentiero_client_error_states/, migration)
+      assert_match(/t\.string :group_id, null: false/, migration)
+      assert_match(/t\.string :status, null: false/, migration)
+      assert_match(/t\.float :changed_at, null: false/, migration)
+      assert_match(/add_index :sentiero_client_error_states, :group_id, unique: true/, migration)
+    end
+  end
+
   test "creates initializer file with active basic_auth block" do
     run_generator
 

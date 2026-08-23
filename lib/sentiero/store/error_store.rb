@@ -68,6 +68,25 @@ module Sentiero
         raise NoMethodError, "#{self.class}#session_ids_for_problem not implemented"
       end
 
+      # Dashboard status for derived client-error groups (ErrorDiscovery ids).
+      # Returns {id => {status:, changed_at:, last_seen_at:}} for the given ids;
+      # unknown ids are absent, and absence means open.
+      def client_error_states(ids)
+        raise NoMethodError, "#{self.class}#client_error_states not implemented"
+      end
+
+      # Upserts one state row. status "open" deletes the row instead.
+      # last_seen_at is the group's last_seen_at (epoch ms) at the moment of
+      # the change: the regression watermark.
+      def set_client_error_state(id, status:, changed_at:, last_seen_at:)
+        raise NoMethodError, "#{self.class}#set_client_error_state not implemented"
+      end
+
+      # Drops state rows whose changed_at is older than cutoff (epoch seconds).
+      def purge_client_error_states(cutoff)
+        raise NoMethodError, "#{self.class}#purge_client_error_states not implemented"
+      end
+
       private
 
       # Shared problem bookkeeping: the semantic source of truth for problem
@@ -121,6 +140,22 @@ module Sentiero
           status: reopening ? "open" : existing[:status],
           resolved_at: reopening ? nil : existing[:resolved_at]
         )
+      end
+
+      def client_error_state_attrs(status, changed_at, last_seen_at)
+        {status: status, changed_at: changed_at.to_f, last_seen_at: last_seen_at&.to_f}
+      end
+
+      # Maps a string-keyed stored state record to the symbol-keyed shape.
+      def client_error_state_from_strings(h)
+        {status: h["status"], changed_at: h["changed_at"], last_seen_at: h["last_seen_at"]}
+      end
+
+      def select_client_error_states(states, ids)
+        ids.each_with_object({}) do |id, out|
+          state = states[id]
+          out[id] = state.dup if state
+        end
       end
 
       def build_problem_title(occurrence)

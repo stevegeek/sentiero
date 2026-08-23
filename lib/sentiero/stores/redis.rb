@@ -406,6 +406,33 @@ module Sentiero
         latest_session_ids(raw.map { |json| JSON.parse(json) }, limit: limit)
       end
 
+      def client_error_states(ids)
+        return {} if ids.empty?
+
+        values = @redis.hmget(@keys.client_error_states, *ids)
+        ids.zip(values).each_with_object({}) do |(id, json), out|
+          out[id] = client_error_state_from_strings(JSON.parse(json)) if json
+        end
+      end
+
+      def set_client_error_state(id, status:, changed_at:, last_seen_at:)
+        validate_id!(id)
+        validate_status!(status)
+        if status == "open"
+          @redis.hdel(@keys.client_error_states, id)
+        else
+          @redis.hset(@keys.client_error_states, id, JSON.generate(client_error_state_attrs(status, changed_at, last_seen_at)))
+        end
+        nil
+      end
+
+      def purge_client_error_states(cutoff)
+        @redis.hscan_each(@keys.client_error_states) do |id, json|
+          @redis.hdel(@keys.client_error_states, id) if JSON.parse(json)["changed_at"].to_f < cutoff.to_f
+        end
+        nil
+      end
+
       def clear!
         # SCAN, not KEYS: KEYS is O(N) over the whole keyspace and blocks the server.
         @redis.scan_each(match: "#{@prefix}*") { |key| @redis.del(key) }
@@ -430,6 +457,7 @@ module Sentiero
         end
 
         purge_error_data_older_than!(cutoff)
+        purge_client_error_states(cutoff)
 
         deleted
       end

@@ -80,6 +80,13 @@ module Sentiero
             CREATE INDEX IF NOT EXISTS idx_server_events_event_id ON server_events(event_id);
             CREATE INDEX IF NOT EXISTS idx_server_events_project ON server_events(project);
             CREATE INDEX IF NOT EXISTS idx_server_events_session ON server_events(session_id);
+
+            CREATE TABLE IF NOT EXISTS client_error_states (
+              id TEXT PRIMARY KEY,
+              status TEXT NOT NULL,
+              changed_at REAL NOT NULL,
+              last_seen_at REAL
+            );
           SQL
 
           migrate_events_type!(db)
