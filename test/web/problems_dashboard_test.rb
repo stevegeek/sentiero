@@ -709,8 +709,6 @@ module Sentiero
         assert_equal 404, last_response.status
       end
 
-      # ── client error status (resolve / ignore / reopen) ──
-
       def client_csrf(id)
         get "/issues/client/#{id}"
         last_response.headers["set-cookie"] =~ /sentiero_csrf=([^;]+)/

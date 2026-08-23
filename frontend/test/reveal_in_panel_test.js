@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 
 import { revealInPanel } from "../src/dashboard/sidebar.js";
 
-// `row` is the viewport-relative position; the panel sits at viewport top 100.
 function row(top, height) {
   return { getBoundingClientRect: () => ({ top, height }) };
 }

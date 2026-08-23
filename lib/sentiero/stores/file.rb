@@ -577,8 +577,6 @@ module Sentiero
         }
       end
 
-      # Client error states live in their own root-level JSON file under the
-      # same lock: client_error_states.json – group id => state hash.
       def read_client_error_states
         raw = read_error_json("client_error_states.json") || {}
         raw.transform_values { |s| client_error_state_from_strings(s) }

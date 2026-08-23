@@ -15,7 +15,7 @@ module Sentiero
         @problems = Concurrent::Map.new # fingerprint => problem Hash (symbol-keyed)
         @occurrences = Concurrent::Map.new # fingerprint => Concurrent::Array of occurrence Hashes
         @server_events = Concurrent::Array.new
-        @client_error_states = Concurrent::Map.new # group id => state Hash (symbol-keyed)
+        @client_error_states = Concurrent::Map.new
       end
 
       def save_events(ref, events)

@@ -483,8 +483,6 @@ module ErrorStoreContractTests
     refute_nil @store.get_problem("fp_purge_new"), "fresh problem should survive"
   end
 
-  # --- client error states -------------------------------------------------
-
   def test_client_error_states_absent_for_unknown_ids
     assert_equal({}, @store.client_error_states(["ce_unknown"]))
     assert_equal({}, @store.client_error_states([]))
