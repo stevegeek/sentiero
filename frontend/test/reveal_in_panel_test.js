@@ -10,7 +10,7 @@ function row(top, height) {
 function panel(scrollTop, clientHeight) {
   const calls = [];
   return {
-    scrollTop, clientHeight, calls,
+    scrollTop, clientHeight, clientTop: 1, calls,
     getBoundingClientRect: () => ({ top: 100 }),
     scrollTo: (o) => calls.push(o),
   };
@@ -25,13 +25,13 @@ test("revealInPanel leaves the panel alone when the row is already visible", () 
 test("revealInPanel scrolls the panel up to a row above the visible area", () => {
   const p = panel(400, 300);
   revealInPanel(p, row(50, 40));
-  assert.deepEqual(p.calls, [{ top: 350, behavior: "smooth" }]);
+  assert.deepEqual(p.calls, [{ top: 349, behavior: "smooth" }]);
 });
 
 test("revealInPanel scrolls the panel down to a row below the visible area", () => {
   const p = panel(0, 300);
   revealInPanel(p, row(500, 40));
-  assert.deepEqual(p.calls, [{ top: 140, behavior: "smooth" }]);
+  assert.deepEqual(p.calls, [{ top: 139, behavior: "smooth" }]);
 });
 
 test("revealInPanel ignores a missing panel", () => {
