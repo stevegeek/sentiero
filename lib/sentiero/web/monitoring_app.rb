@@ -267,8 +267,6 @@ module Sentiero
         render_page(env, Views::ClientErrorShowView.new(group: group, was_truncated: result[:was_truncated]))
       end
 
-      # Mirrors handle_error_status for the derived client lane. The group's
-      # current last_seen_at becomes the regression watermark.
       def handle_client_error_status(env, id)
         request = Rack::Request.new(env)
         return forbidden_csrf unless valid_csrf_token?(env, request.POST["csrf_token"])
@@ -285,8 +283,6 @@ module Sentiero
         redirect(issues_referer(env) || "#{base_path(env)}/issues/client/#{id}", status: 303)
       end
 
-      # The referer's path+query when it points back at this mount's /issues
-      # listing, so the list keeps its filters after a status change.
       def issues_referer(env)
         referer = env["HTTP_REFERER"]
         return nil if referer.nil? || referer.empty?

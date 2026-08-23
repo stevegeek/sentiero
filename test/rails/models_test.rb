@@ -171,8 +171,6 @@ class Sentiero::Rails::ModelsTest < Minitest::Test
     assert_includes ev.errors.attribute_names, :project
   end
 
-  # --- ClientErrorState ---
-
   def test_client_error_state_valid_with_full_attrs
     state = Sentiero::Rails::ClientErrorState.new(group_id: "abc123", status: "resolved", changed_at: 1.0, last_seen_at: 2.0)
     assert state.valid?

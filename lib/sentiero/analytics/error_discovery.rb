@@ -18,10 +18,6 @@ module Sentiero
 
       STATUS_FILTERS = %w[open resolved ignored all].freeze
 
-      # status: nil (= "open", which includes regressed) | "open" | "resolved" |
-      # "ignored" | "all". Each group carries :status (effective, see
-      # #effective_status), :state (the stored row or nil) and :regressions
-      # (occurrences newer than the resolve watermark).
       def grouped_errors(sort_by: "count", since: nil, until_time: nil, status: nil)
         groups = {}
 
@@ -39,8 +35,6 @@ module Sentiero
 
       private
 
-      # Absent row = open. Ignored never reopens. A resolved group seen again
-      # after its watermark is "regressed", a display flavour of open.
       def effective_status(group)
         state = group[:state]
         return "open" if state.nil?
@@ -95,7 +89,6 @@ module Sentiero
         payload.is_a?(Hash) ? payload : {}
       end
 
-      # Occurrences newer than a resolved state's watermark count as regressions.
       def regression?(state, timestamp)
         state && state[:status] == "resolved" && timestamp && timestamp.to_f > state[:last_seen_at].to_f
       end

@@ -354,8 +354,6 @@ module Sentiero
         assert_equal ["Boom"], messages(in_window)
       end
 
-      # ── status (resolve / ignore / regression) ──
-
       def group_id(message)
         Digest::SHA1.hexdigest(ErrorCollector.group_key(message))
       end

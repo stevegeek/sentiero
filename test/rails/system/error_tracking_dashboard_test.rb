@@ -65,7 +65,7 @@ class ErrorTrackingDashboardTest < Minitest::Test
     assert_text "Browser went boom"
 
     click_button "Resolve"
-    assert_no_text "Browser went boom" # default list shows open groups only
+    assert_no_text "Browser went boom"
 
     select "Resolved", from: "status"
     click_button "Filter"
