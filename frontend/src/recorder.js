@@ -104,10 +104,20 @@ function setupWebVitals() {
     });
 }
 
+// Event targets are not always elements: focus/blur fire on `document`, and
+// clicks can land on text nodes. Resolve to the nearest element or null.
+export function elementFor(target) {
+  if (!target) return null;
+  if (target.nodeType === 1) return target;
+  const parent = target.parentElement;
+  return parent && parent.nodeType === 1 ? parent : null;
+}
+
 function setupNavigationTracking(cfg) {
   // Capture phase so the link click is recorded before navigation happens.
   document.addEventListener("click", (e) => {
-    const link = e.target.closest("a[href]");
+    const target = elementFor(e.target);
+    const link = target && target.closest("a[href]");
     if (!link) return;
 
     const href = link.href;
@@ -186,7 +196,8 @@ function setupCustomEventTracking(cfg) {
       eventType,
       (e) => {
         const attr = `data-sentiero-track-${eventType}`;
-        const el = e.target.closest(`[${attr}]`);
+        const target = elementFor(e.target);
+        const el = target && target.closest(`[${attr}]`);
         if (!el) return;
 
         const eventName = el.getAttribute(attr);
