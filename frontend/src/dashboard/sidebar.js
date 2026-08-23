@@ -132,6 +132,19 @@ export function startPlaybackTracking() {
   }, 250);
 }
 
+// Scroll only the sidebar's own scroller. scrollIntoView would also move the
+// document, which on the stacked mobile layout drags the page off the player.
+export function revealInPanel(panel, row) {
+  if (!panel) return;
+  const rowRect = row.getBoundingClientRect();
+  const top = rowRect.top - panel.getBoundingClientRect().top + panel.scrollTop;
+  const bottom = top + rowRect.height;
+  if (top < panel.scrollTop) panel.scrollTo({ top, behavior: "smooth" });
+  else if (bottom > panel.scrollTop + panel.clientHeight) {
+    panel.scrollTo({ top: bottom - panel.clientHeight, behavior: "smooth" });
+  }
+}
+
 export function highlightCurrentActivity(currentTimeMs) {
   const wrappers = document.querySelectorAll(".activity-wrapper");
   if (wrappers.length === 0) return;
@@ -150,7 +163,7 @@ export function highlightCurrentActivity(currentTimeMs) {
     if (j === activeIndex) {
       if (!entry.classList.contains("active")) {
         entry.classList.add("active");
-        wrappers[j].scrollIntoView({ block: "nearest", behavior: "smooth" });
+        revealInPanel(document.getElementById("activity-sidebar"), wrappers[j]);
       }
     } else {
       entry.classList.remove("active");
