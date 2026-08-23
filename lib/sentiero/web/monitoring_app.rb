@@ -32,6 +32,9 @@ module Sentiero
           get_only(method) || guard(event_id) || handle_event_show(env, event_id)
         when "/issues"
           handle_errors_index(env)
+        when %r{\A/issues/client/([^/]+)/status\z}
+          id = $1
+          post_only(method) || guard(id) || handle_client_error_status(env, id)
         when %r{\A/issues/client/([^/]+)\z}
           # Matched BEFORE the generic /issues/:id case so "client" isn't taken as
           # a server fingerprint. Client error ids are ErrorDiscovery group digests,
@@ -212,6 +215,7 @@ module Sentiero
 
       def handle_client_errors_index(env, params)
         sort_by = %w[count recency].include?(params["sort_by"]) ? params["sort_by"] : "count"
+        status = Sentiero::Analytics::ErrorDiscovery::STATUS_FILTERS.include?(params["status"]) ? params["status"] : nil
         search = params["search"]
         since, until_time = parse_range_params(params)
         since_param, until_param = echo_range_params(params, since, until_time)
@@ -219,7 +223,7 @@ module Sentiero
         page, per_page, offset = paginate(params, default: 50, max: 200)
 
         result = Sentiero::Analytics::ErrorDiscovery.new(Sentiero.store)
-          .grouped_errors(sort_by: sort_by, since: since, until_time: until_time)
+          .grouped_errors(sort_by: sort_by, since: since, until_time: until_time, status: status)
         groups = result[:groups]
         if search && !search.empty?
           term = search.downcase
@@ -230,7 +234,7 @@ module Sentiero
         audit!(env, action: :list_problems)
 
         # Bounded count of the sibling server-exceptions tab for the empty-state cross-link.
-        sibling = if groups.empty? && search.to_s.empty? && since.nil? && until_time.nil?
+        sibling = if groups.empty? && status.nil? && search.to_s.empty? && since.nil? && until_time.nil?
           problems = Sentiero.store.list_problems(project: nil, limit: SIBLING_COUNT_LIMIT)
           {count: problems.size, capped: problems.size >= SIBLING_COUNT_LIMIT}
         end
@@ -239,6 +243,7 @@ module Sentiero
           source: "client",
           groups: page_groups,
           sibling: sibling,
+          status: status || "",
           sort_by: sort_by,
           search: search || "",
           since_param: since_param,
@@ -253,13 +258,47 @@ module Sentiero
       # Client-side JS error detail page. Re-runs ErrorDiscovery and finds the
       # group whose stable :id matches.
       def handle_client_error_show(env, id)
-        result = Sentiero::Analytics::ErrorDiscovery.new(Sentiero.store).grouped_errors
+        result = Sentiero::Analytics::ErrorDiscovery.new(Sentiero.store).grouped_errors(status: "all")
         group = result[:groups].find { |g| g[:id] == id }
         return not_found if group.nil?
 
         audit!(env, action: :view_client_error)
 
-        render_page(env, Views::ClientErrorShowView.new(group: group, was_truncated: result[:was_truncated]), csrf: false)
+        render_page(env, Views::ClientErrorShowView.new(group: group, was_truncated: result[:was_truncated]))
+      end
+
+      # Mirrors handle_error_status for the derived client lane. The group's
+      # current last_seen_at becomes the regression watermark.
+      def handle_client_error_status(env, id)
+        request = Rack::Request.new(env)
+        return forbidden_csrf unless valid_csrf_token?(env, request.POST["csrf_token"])
+
+        status = request.POST["status"]
+        return [400, {"content-type" => "text/plain"}, ["bad status"]] unless %w[open resolved ignored].include?(status)
+
+        group = Sentiero::Analytics::ErrorDiscovery.new(Sentiero.store).grouped_errors(status: "all")[:groups].find { |g| g[:id] == id }
+        return not_found if group.nil?
+
+        Sentiero.store.set_client_error_state(id, status: status, changed_at: Time.now.to_f, last_seen_at: group[:last_seen_at])
+        audit!(env, action: :update_client_error_status)
+
+        redirect(issues_referer(env) || "#{base_path(env)}/issues/client/#{id}", status: 303)
+      end
+
+      # The referer's path+query when it points back at this mount's /issues
+      # listing, so the list keeps its filters after a status change.
+      def issues_referer(env)
+        referer = env["HTTP_REFERER"]
+        return nil if referer.nil? || referer.empty?
+
+        uri = URI.parse(referer)
+        request = Rack::Request.new(env)
+        return nil if uri.host && uri.host != request.host
+        return nil unless uri.path == "#{base_path(env)}/issues"
+
+        uri.query ? "#{uri.path}?#{uri.query}" : uri.path
+      rescue URI::InvalidURIError
+        nil
       end
 
       def handle_error_show(env, problem_id)

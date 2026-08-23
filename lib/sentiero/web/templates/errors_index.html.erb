@@ -7,12 +7,12 @@
 <% if view.source == "client" -%>
   <%= view.render_partial("_truncation_warning.html.erb", was_truncated: view.was_truncated, noun: "entries") %>
 
-  <%= view.render_partial("_errors_client_filter.html.erb", search: view.search, sort_by: view.sort_by, per_page: view.per_page,
+  <%= view.render_partial("_errors_client_filter.html.erb", search: view.search, status: view.status, sort_by: view.sort_by, per_page: view.per_page,
     since_param: view.since_param, until_param: view.until_param) %>
 
   <% if view.groups.empty? -%>
     <div class="card"><div class="text-center py-10 px-6 text-gray-400 text-xs">
-      <% if !view.search.empty? -%>
+      <% if !view.search.empty? || !view.status.empty? || !view.since_param.empty? || !view.until_param.empty? -%>
         No results match your filters.
         <a href="<%= view.h(view.base_path) %>/issues?source=client" class="text-blue-600 hover:text-blue-800">Clear filters</a>
       <% else -%>
@@ -24,7 +24,7 @@
   <% else -%>
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>Error</th><th class="w-24">Browser</th><th class="w-20">Count</th><th class="w-32">Last seen</th></tr></thead>
+        <thead><tr><th>Error</th><th class="w-24">Browser</th><th class="w-20">Count</th><th class="w-24">Status</th><th class="w-32">Last seen</th><th></th></tr></thead>
         <tbody>
           <% view.groups.each do |group| -%>
             <tr>
@@ -50,8 +50,17 @@
                 <% end -%>
               </td>
               <td><span class="badge badge-danger tabular-nums"><%= group[:count] %>&times;</span></td>
+              <td>
+                <%= view.render_partial("_client_error_status_badge.html.erb", status: group[:status]) %>
+                <% if group[:status] == "regressed" -%>
+                  <span class="block text-[10px] text-gray-400 mt-0.5 tabular-nums"><%= group[:regressions] %>&times; since <%= Time.at(group.dig(:state, :changed_at).to_f).utc.strftime("%b %d") %></span>
+                <% end -%>
+              </td>
               <td class="text-gray-400 text-[10px] tabular-nums">
                 <%= group[:last_seen_at] ? Time.at(group[:last_seen_at].to_f / 1000).utc.strftime("%b %d, %H:%M") : "—" %>
+              </td>
+              <td class="text-right">
+                <%= view.render_partial("_client_error_status_form.html.erb", group: group) %>
               </td>
             </tr>
           <% end -%>
@@ -61,7 +70,7 @@
 
     <%= view.render_partial("_pagination.html.erb",
       base_href: "#{view.base_path}/issues", page: view.page, has_next: view.has_next,
-      params: {"source" => "client", "search" => view.search, "sort_by" => view.sort_by,
+      params: {"source" => "client", "search" => view.search, "status" => view.status, "sort_by" => view.sort_by,
                "since" => view.since_param, "until" => view.until_param, "per_page" => view.per_page.to_s}) %>
   <% end -%>
 <% else -%>

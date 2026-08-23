@@ -8,6 +8,15 @@
                value="<%= view.h(search) %>" placeholder="Error message…">
       </div>
       <div class="shrink-0">
+        <label for="status" class="label">Status</label>
+        <select name="status" id="status" class="select w-36">
+          <option value=""         <%= "selected" if status.empty? || status == "open" %>>Open</option>
+          <option value="resolved" <%= "selected" if status == "resolved" %>>Resolved</option>
+          <option value="ignored"  <%= "selected" if status == "ignored" %>>Ignored</option>
+          <option value="all"      <%= "selected" if status == "all" %>>All</option>
+        </select>
+      </div>
+      <div class="shrink-0">
         <label for="sort_by" class="label">Sort by</label>
         <select name="sort_by" id="sort_by" class="select w-36">
           <option value="count"   <%= "selected" if sort_by == "count" %>>Count</option>

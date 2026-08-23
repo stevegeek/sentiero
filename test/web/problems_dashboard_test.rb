@@ -709,6 +709,182 @@ module Sentiero
         assert_equal 404, last_response.status
       end
 
+      # ── client error status (resolve / ignore / reopen) ──
+
+      def client_csrf(id)
+        get "/issues/client/#{id}"
+        last_response.headers["set-cookie"] =~ /sentiero_csrf=([^;]+)/
+        $1
+      end
+
+      def test_client_error_status_update_requires_csrf
+        seed_client_error("err-1", "w1", {"message" => "Status boom"})
+        id = client_group_id("Status boom")
+        post "/issues/client/#{id}/status", {"status" => "resolved"}
+        assert_equal 403, last_response.status
+        assert_equal({}, @store.client_error_states([id]))
+      end
+
+      def test_client_error_status_update_forbidden_without_auth
+        Sentiero.configuration.auth_callback = ->(_e) { false }
+        post "/issues/client/abc/status", {"status" => "resolved"}
+        assert_equal 403, last_response.status
+      end
+
+      def test_client_error_status_update_resolves_with_watermark
+        seed_client_error("err-1", "w1", {"message" => "Status boom"}, at: 2_000_000)
+        id = client_group_id("Status boom")
+        token = client_csrf(id)
+        post "/issues/client/#{id}/status", {"status" => "resolved", "csrf_token" => token}
+        assert_equal 303, last_response.status
+        assert_equal "/issues/client/#{id}", last_response.headers["location"]
+        state = @store.client_error_states([id])[id]
+        assert_equal "resolved", state[:status]
+        assert_equal 2_000_500.0, state[:last_seen_at]
+        assert_in_delta Time.now.to_f, state[:changed_at], 5
+      end
+
+      def test_client_error_status_update_redirects_to_referer
+        seed_client_error("err-1", "w1", {"message" => "Status boom"})
+        id = client_group_id("Status boom")
+        token = client_csrf(id)
+        post "/issues/client/#{id}/status", {"status" => "ignored", "csrf_token" => token},
+          "HTTP_REFERER" => "http://example.org/issues?source=client&status=all"
+        assert_equal 303, last_response.status
+        assert_equal "/issues?source=client&status=all", last_response.headers["location"]
+        assert_equal "ignored", @store.client_error_states([id])[id][:status]
+      end
+
+      def test_client_error_status_update_ignores_foreign_referer
+        seed_client_error("err-1", "w1", {"message" => "Status boom"})
+        id = client_group_id("Status boom")
+        token = client_csrf(id)
+        post "/issues/client/#{id}/status", {"status" => "ignored", "csrf_token" => token},
+          "HTTP_REFERER" => "http://evil.example/phish"
+        assert_equal "/issues/client/#{id}", last_response.headers["location"]
+      end
+
+      def test_client_error_status_update_open_deletes_state
+        seed_client_error("err-1", "w1", {"message" => "Status boom"})
+        id = client_group_id("Status boom")
+        @store.set_client_error_state(id, status: "resolved", changed_at: 1.0, last_seen_at: 1.0)
+        token = client_csrf(id)
+        post "/issues/client/#{id}/status", {"status" => "open", "csrf_token" => token}
+        assert_equal 303, last_response.status
+        assert_equal({}, @store.client_error_states([id]))
+      end
+
+      def test_client_error_status_update_rejects_bad_status
+        seed_client_error("err-1", "w1", {"message" => "Status boom"})
+        id = client_group_id("Status boom")
+        token = client_csrf(id)
+        post "/issues/client/#{id}/status", {"status" => "banana", "csrf_token" => token}
+        assert_equal 400, last_response.status
+        assert_equal({}, @store.client_error_states([id]))
+      end
+
+      def test_client_error_status_update_unknown_id_is_404
+        seed_client_error("err-1", "w1", {"message" => "Status boom"})
+        token = client_csrf(client_group_id("Status boom"))
+        post "/issues/client/deadbeef/status", {"status" => "resolved", "csrf_token" => token}
+        assert_equal 404, last_response.status
+      end
+
+      def test_client_error_status_update_audits
+        events = []
+        Sentiero.configuration.audit_log = ->(entry) { events << entry }
+        seed_client_error("err-1", "w1", {"message" => "Status boom"})
+        id = client_group_id("Status boom")
+        token = client_csrf(id)
+        post "/issues/client/#{id}/status", {"status" => "resolved", "csrf_token" => token}
+        assert_equal :update_client_error_status, events.last[:action]
+      end
+
+      def test_client_error_status_update_get_is_404
+        get "/issues/client/abc/status"
+        assert_equal 404, last_response.status
+      end
+
+      def test_errors_index_client_hides_resolved_by_default_and_filters
+        seed_client_error("err-1", "w1", {"message" => "Open boom"})
+        seed_client_error("err-2", "w1", {"message" => "Resolved boom"}, at: 3_000_000)
+        id = client_group_id("Resolved boom")
+        @store.set_client_error_state(id, status: "resolved", changed_at: Time.now.to_f, last_seen_at: 3_000_500)
+
+        get "/issues?source=client"
+        assert_includes last_response.body, "Open boom"
+        refute_includes last_response.body, "Resolved boom"
+
+        get "/issues?source=client&status=resolved"
+        refute_includes last_response.body, "Open boom"
+        assert_includes last_response.body, "Resolved boom"
+        assert_includes last_response.body, "badge-success"
+        assert_includes last_response.body, ">Reopen<"
+
+        get "/issues?source=client&status=all"
+        assert_includes last_response.body, "Open boom"
+        assert_includes last_response.body, "Resolved boom"
+      end
+
+      def test_errors_index_client_rows_have_resolve_and_ignore_forms
+        seed_client_error("err-1", "w1", {"message" => "Open boom"})
+        id = client_group_id("Open boom")
+        get "/issues?source=client"
+        body = last_response.body
+        assert_includes body, "/issues/client/#{id}/status"
+        assert_includes body, ">Resolve<"
+        assert_includes body, ">Ignore<"
+        assert_includes body, 'name="csrf_token"'
+      end
+
+      def test_errors_index_client_filter_has_status_select
+        get "/issues?source=client&status=ignored"
+        body = last_response.body
+        assert_includes body, 'name="status"'
+        assert_match(/<option value="ignored"\s+selected>/, body)
+      end
+
+      def test_errors_index_client_marks_regressed_groups
+        seed_client_error("err-1", "w1", {"message" => "Again boom"}, at: 1_000_000)
+        id = client_group_id("Again boom")
+        @store.set_client_error_state(id, status: "resolved", changed_at: Time.now.to_f, last_seen_at: 1_000_500)
+        seed_client_error("err-2", "w1", {"message" => "Again boom"}, at: 2_000_000)
+
+        get "/issues?source=client"
+        body = last_response.body
+        assert_includes body, "Again boom"
+        assert_includes body, "regressed"
+      end
+
+      def test_client_error_show_renders_status_and_actions
+        seed_client_error("err-1", "w1", {"message" => "Show boom"}, at: 1_000_000)
+        id = client_group_id("Show boom")
+        @store.set_client_error_state(id, status: "resolved", changed_at: 1_700_000_000.0, last_seen_at: 1_000_500)
+        seed_client_error("err-2", "w1", {"message" => "Show boom"}, at: 2_000_000)
+        seed_client_error("err-3", "w1", {"message" => "Show boom"}, at: 2_100_000)
+
+        get "/issues/client/#{id}"
+        body = last_response.body
+        assert_equal 200, last_response.status
+        assert_includes last_response.headers["set-cookie"], "sentiero_csrf="
+        assert_includes body, "regressed"
+        assert_includes body, "seen again 2 times since"
+        assert_includes body, "/issues/client/#{id}/status"
+        assert_includes body, ">Resolve<"
+        assert_includes body, ">Reopen<"
+      end
+
+      def test_client_error_show_renders_ignored_line
+        seed_client_error("err-1", "w1", {"message" => "Quiet boom"})
+        id = client_group_id("Quiet boom")
+        @store.set_client_error_state(id, status: "ignored", changed_at: 1_700_000_000.0, last_seen_at: 1_000_500)
+
+        get "/issues/client/#{id}"
+        assert_equal 200, last_response.status
+        assert_includes last_response.body, "Ignored on"
+        refute_includes last_response.body, ">Ignore<"
+      end
+
       def test_client_error_show_renders_stack
         seed_client_error("err-1", "w1", {
           "message" => "Stack boom",

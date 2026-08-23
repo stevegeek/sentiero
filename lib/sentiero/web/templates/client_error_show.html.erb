@@ -3,6 +3,10 @@
     <a href="<%= view.h(view.base_path) %>/issues?source=client" class="btn btn-sm btn-secondary shrink-0">&larr; Back</a>
     <div class="w-px h-4 bg-gray-200 shrink-0"></div>
     <span class="badge badge-danger shrink-0"><%= view.group[:count] %> occurrence<%= view.group[:count] == 1 ? "" : "s" %></span>
+    <%= view.render_partial("_client_error_status_badge.html.erb", status: view.status) %>
+    <div class="ml-auto shrink-0">
+      <%= view.render_partial("_client_error_status_form.html.erb", group: view.group) %>
+    </div>
   </div>
 </div>
 
@@ -23,6 +27,20 @@
       <div class="text-xs text-gray-600">
         <%= view.group[:last_seen_at] ? Time.at(view.group[:last_seen_at].to_f / 1000).utc.strftime("%b %d, %Y %H:%M:%S UTC") : "N/A" %>
       </div>
+
+      <% if view.status != "open" -%>
+        <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Status</div>
+        <div class="text-xs text-gray-600" data-client-error-status="<%= view.h(view.status) %>">
+          <% case view.status
+             when "resolved" -%>
+            Resolved on <%= view.h(view.changed_on) %>
+          <% when "ignored" -%>
+            Ignored on <%= view.h(view.changed_on) %>
+          <% when "regressed" -%>
+            Resolved on <%= view.h(view.changed_on) %>, seen again <%= view.group[:regressions] %> time<%= view.group[:regressions] == 1 ? "" : "s" %> since
+          <% end -%>
+        </div>
+      <% end -%>
 
       <% if view.group[:stack] -%>
         <div class="text-[10px] font-medium text-gray-400 uppercase tracking-wider pt-0.5">Stack</div>

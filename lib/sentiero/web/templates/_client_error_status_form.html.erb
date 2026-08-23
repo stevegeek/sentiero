@@ -1,0 +1,12 @@
+<form method="post" action="<%= view.h(view.base_path) %>/issues/client/<%= view.h(group[:id]) %>/status" class="inline-flex gap-1">
+  <input type="hidden" name="csrf_token" value="<%= view.h(view.csrf_token) %>">
+  <% unless group[:status] == "resolved" -%>
+    <button type="submit" name="status" value="resolved" class="btn btn-sm btn-primary">Resolve</button>
+  <% end -%>
+  <% unless group[:status] == "ignored" -%>
+    <button type="submit" name="status" value="ignored" class="btn btn-sm btn-secondary">Ignore</button>
+  <% end -%>
+  <% unless group[:status] == "open" -%>
+    <button type="submit" name="status" value="open" class="btn btn-sm btn-secondary">Reopen</button>
+  <% end -%>
+</form>

@@ -1,0 +1,10 @@
+<% case status
+   when "resolved" -%>
+  <span class="badge badge-success">resolved</span>
+<% when "ignored" -%>
+  <span class="badge badge-neutral">ignored</span>
+<% when "regressed" -%>
+  <span class="badge badge-warning">regressed</span>
+<% else -%>
+  <span class="badge badge-danger">open</span>
+<% end -%>
