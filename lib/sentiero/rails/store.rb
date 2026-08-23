@@ -198,7 +198,7 @@ module Sentiero
             Occurrence.where(fingerprint: stale_fps).delete_all
             Problem.where(fingerprint: stale_fps).delete_all
           end
-          ClientErrorState.where("changed_at < ?", cutoff_f).delete_all
+          ClientErrorState.where(status: "resolved").where("changed_at < ?", cutoff_f).delete_all
         end
 
         session_count
@@ -343,7 +343,7 @@ module Sentiero
       end
 
       def purge_client_error_states(cutoff)
-        ClientErrorState.where("changed_at < ?", cutoff.to_f).delete_all
+        ClientErrorState.where(status: "resolved").where("changed_at < ?", cutoff.to_f).delete_all
         nil
       end
 
