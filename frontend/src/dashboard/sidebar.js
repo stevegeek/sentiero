@@ -137,7 +137,7 @@ export function startPlaybackTracking() {
 export function revealInPanel(panel, row) {
   if (!panel) return;
   const rowRect = row.getBoundingClientRect();
-  const top = rowRect.top - panel.getBoundingClientRect().top + panel.scrollTop;
+  const top = rowRect.top - panel.getBoundingClientRect().top - panel.clientTop + panel.scrollTop;
   const bottom = top + rowRect.height;
   if (top < panel.scrollTop) panel.scrollTo({ top, behavior: "smooth" });
   else if (bottom > panel.scrollTop + panel.clientHeight) {
