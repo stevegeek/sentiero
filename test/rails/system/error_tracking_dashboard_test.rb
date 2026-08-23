@@ -22,6 +22,9 @@ class ErrorTrackingDashboardTest < Minitest::Test
     Sentiero::Rails::Problem.delete_all
     Sentiero::Rails::Occurrence.delete_all
     Sentiero::Rails::ServerEvent.delete_all
+    Sentiero::Rails::ClientErrorState.delete_all
+    Sentiero::Rails::Event.delete_all
+    Sentiero::Rails::Session.delete_all
   end
 
   def teardown
@@ -49,6 +52,25 @@ class ErrorTrackingDashboardTest < Minitest::Test
 
     click_button "Resolve"
     assert_text "resolved" # status flips in the re-rendered page
+  end
+
+  def test_client_error_can_be_resolved_from_list_and_found_under_resolved_filter
+    now_ms = (Time.now.to_f * 1000).round
+    Sentiero.store.save_events(Sentiero::WindowRef.new("sys-sess-1", "w1"), [
+      {"type" => 3, "timestamp" => now_ms},
+      {"type" => 5, "timestamp" => now_ms + 500, "data" => {"tag" => "error", "payload" => {"message" => "Browser went boom"}}}
+    ])
+
+    visit "/sentiero/issues?source=client"
+    assert_text "Browser went boom"
+
+    click_button "Resolve"
+    assert_no_text "Browser went boom" # default list shows open groups only
+
+    select "Resolved", from: "status"
+    click_button "Filter"
+    assert_text "Browser went boom"
+    assert_selector ".badge-success", text: "resolved"
   end
 
   def test_custom_events_page_lists_tracked_events

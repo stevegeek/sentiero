@@ -16,6 +16,13 @@ module Sentiero
 
         def template = "client_error_show.html.erb"
 
+        def status = group[:status]
+
+        def changed_on
+          changed_at = group.dig(:state, :changed_at)
+          changed_at ? Time.at(changed_at.to_f).utc.strftime("%b %d, %Y %H:%M UTC") : nil
+        end
+
         def facet_chips
           [
             ["Browsers", group[:browsers] || {}],
