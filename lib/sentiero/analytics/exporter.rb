@@ -73,7 +73,7 @@ module Sentiero
       def build_errors
         headers = %w[message source line count last_seen_at session_id window_id offset_ms]
 
-        rows = ErrorDiscovery.new(store).grouped_errors(since: since, until_time: until_time)[:groups].flat_map do |group|
+        rows = ErrorDiscovery.new(store).grouped_errors(since: since, until_time: until_time, status: "all")[:groups].flat_map do |group|
           group[:occurrences].map do |occ|
             [
               group[:message],
