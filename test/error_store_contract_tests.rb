@@ -482,4 +482,57 @@ module ErrorStoreContractTests
     assert_empty @store.list_server_events(project: nil, limit: 50).select { |e| e["name"] == "old_evt" }
     refute_nil @store.get_problem("fp_purge_new"), "fresh problem should survive"
   end
+
+  # --- client error states -------------------------------------------------
+
+  def test_client_error_states_absent_for_unknown_ids
+    assert_equal({}, @store.client_error_states(["ce_unknown"]))
+    assert_equal({}, @store.client_error_states([]))
+  end
+
+  def test_set_client_error_state_upserts
+    @store.set_client_error_state("ce_a", status: "resolved", changed_at: 100.0, last_seen_at: 5000.0)
+    states = @store.client_error_states(["ce_a", "ce_missing"])
+    assert_equal ["ce_a"], states.keys
+    assert_equal({status: "resolved", changed_at: 100.0, last_seen_at: 5000.0}, states["ce_a"])
+
+    @store.set_client_error_state("ce_a", status: "ignored", changed_at: 200.0, last_seen_at: 6000.0)
+    assert_equal({status: "ignored", changed_at: 200.0, last_seen_at: 6000.0}, @store.client_error_states(["ce_a"])["ce_a"])
+  end
+
+  def test_set_client_error_state_open_deletes_row
+    @store.set_client_error_state("ce_b", status: "resolved", changed_at: 100.0, last_seen_at: 5000.0)
+    @store.set_client_error_state("ce_b", status: "open", changed_at: 200.0, last_seen_at: 6000.0)
+    assert_equal({}, @store.client_error_states(["ce_b"]))
+  end
+
+  def test_set_client_error_state_open_for_unknown_id_is_safe
+    @store.set_client_error_state("ce_c", status: "open", changed_at: 200.0, last_seen_at: nil)
+    assert_equal({}, @store.client_error_states(["ce_c"]))
+  end
+
+  def test_set_client_error_state_allows_nil_last_seen_at
+    @store.set_client_error_state("ce_d", status: "ignored", changed_at: 100.0, last_seen_at: nil)
+    assert_nil @store.client_error_states(["ce_d"])["ce_d"][:last_seen_at]
+  end
+
+  def test_set_client_error_state_rejects_invalid_status
+    assert_raises(ArgumentError) do
+      @store.set_client_error_state("ce_e", status: "banana", changed_at: 100.0, last_seen_at: nil)
+    end
+  end
+
+  def test_purge_client_error_states_drops_rows_older_than_cutoff
+    @store.set_client_error_state("ce_old", status: "resolved", changed_at: 100.0, last_seen_at: nil)
+    @store.set_client_error_state("ce_new", status: "resolved", changed_at: 300.0, last_seen_at: nil)
+    @store.purge_client_error_states(200.0)
+    assert_equal ["ce_new"], @store.client_error_states(["ce_old", "ce_new"]).keys
+  end
+
+  def test_purge_older_than_drops_stale_client_error_states
+    @store.set_client_error_state("ce_stale", status: "resolved", changed_at: 1.0, last_seen_at: nil)
+    @store.set_client_error_state("ce_fresh", status: "resolved", changed_at: ::Time.now.to_f, last_seen_at: nil)
+    @store.purge_older_than(60)
+    assert_equal ["ce_fresh"], @store.client_error_states(["ce_stale", "ce_fresh"]).keys
+  end
 end

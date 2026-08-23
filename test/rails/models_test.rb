@@ -170,4 +170,24 @@ class Sentiero::Rails::ModelsTest < Minitest::Test
     refute ev.valid?
     assert_includes ev.errors.attribute_names, :project
   end
+
+  # --- ClientErrorState ---
+
+  def test_client_error_state_valid_with_full_attrs
+    state = Sentiero::Rails::ClientErrorState.new(group_id: "abc123", status: "resolved", changed_at: 1.0, last_seen_at: 2.0)
+    assert state.valid?
+  end
+
+  def test_client_error_state_rejects_status_outside_set
+    state = Sentiero::Rails::ClientErrorState.new(group_id: "abc123", status: "bogus", changed_at: 1.0)
+    refute state.valid?
+    assert_includes state.errors.attribute_names, :status
+  end
+
+  def test_client_error_state_requires_group_id_and_changed_at
+    state = Sentiero::Rails::ClientErrorState.new
+    refute state.valid?
+    assert_includes state.errors.attribute_names, :group_id
+    assert_includes state.errors.attribute_names, :changed_at
+  end
 end

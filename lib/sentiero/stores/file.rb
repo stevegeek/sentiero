@@ -291,6 +291,30 @@ module Sentiero
         latest_session_ids(occurrences[problem_id] || [], limit: limit)
       end
 
+      def client_error_states(ids)
+        select_client_error_states(read_client_error_states, ids)
+      end
+
+      def set_client_error_state(id, status:, changed_at:, last_seen_at:)
+        validate_id!(id)
+        validate_status!(status)
+        update_client_error_states do |states|
+          if status == "open"
+            states.delete(id)
+          else
+            states[id] = client_error_state_attrs(status, changed_at, last_seen_at)
+          end
+        end
+        nil
+      end
+
+      def purge_client_error_states(cutoff)
+        update_client_error_states do |states|
+          states.delete_if { |_id, state| state[:changed_at] < cutoff.to_f }
+        end
+        nil
+      end
+
       def clear!
         FileUtils.rm_rf(Dir.glob(::File.join(@root, "*")))
         nil
@@ -310,6 +334,7 @@ module Sentiero
         deleted = stale.size
 
         purge_error_data_older_than!(cutoff)
+        purge_client_error_states(cutoff)
 
         deleted
       end
@@ -550,6 +575,30 @@ module Sentiero
           "last_seen" => p[:last_seen],
           "resolved_at" => p[:resolved_at]
         }
+      end
+
+      # Client error states live in their own root-level JSON file under the
+      # same lock: client_error_states.json – group id => state hash.
+      def read_client_error_states
+        raw = read_error_json("client_error_states.json") || {}
+        raw.transform_values { |s| client_error_state_from_strings(s) }
+      end
+
+      def update_client_error_states
+        ::File.open(error_lock_path, ::File::RDWR | ::File::CREAT, 0o600) do |lock|
+          lock.flock(::File::LOCK_EX)
+          states = read_client_error_states
+          yield states
+          raw = states.transform_values { |s| stringify_client_error_state(s) }
+          path = error_data_path("client_error_states.json")
+          tmp = "#{path}.tmp.#{Process.pid}"
+          ::File.write(tmp, JSON.generate(raw))
+          ::File.rename(tmp, path)
+        end
+      end
+
+      def stringify_client_error_state(s)
+        {"status" => s[:status], "changed_at" => s[:changed_at], "last_seen_at" => s[:last_seen_at]}
       end
 
       def purge_error_data_older_than!(cutoff)

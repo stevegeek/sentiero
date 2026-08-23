@@ -79,6 +79,21 @@ ActiveRecord::Schema.define do
   add_check_constraint :sentiero_problems, "status IN ('open', 'resolved', 'ignored')",
     name: "sentiero_problems_status_check"
 
+  create_table :sentiero_client_error_states, force: true do |t|
+    t.string :group_id, null: false
+    t.string :status, null: false
+    t.float :changed_at, null: false
+    t.float :last_seen_at
+  end
+
+  add_index :sentiero_client_error_states, :group_id, unique: true,
+    name: "index_sentiero_client_error_states_on_group_id"
+  add_index :sentiero_client_error_states, :changed_at,
+    name: "index_sentiero_client_error_states_on_changed_at"
+
+  add_check_constraint :sentiero_client_error_states, "status IN ('open', 'resolved', 'ignored')",
+    name: "sentiero_client_error_states_status_check"
+
   add_foreign_key :sentiero_events, :sentiero_sessions,
     column: :session_id, primary_key: :session_id, on_delete: :cascade
 end

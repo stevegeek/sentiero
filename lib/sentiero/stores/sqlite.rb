@@ -505,6 +505,36 @@ module Sentiero
         db.execute(sql, params).map { |row| row["session_id"] }
       end
 
+      def client_error_states(ids)
+        return {} if ids.empty?
+
+        placeholders = (["?"] * ids.size).join(", ")
+        rows = db.execute("SELECT id, status, changed_at, last_seen_at FROM client_error_states WHERE id IN (#{placeholders})", ids)
+        rows.each_with_object({}) do |row, out|
+          out[row["id"]] = {status: row["status"], changed_at: row["changed_at"], last_seen_at: row["last_seen_at"]}
+        end
+      end
+
+      def set_client_error_state(id, status:, changed_at:, last_seen_at:)
+        validate_id!(id)
+        validate_status!(status)
+        if status == "open"
+          db.execute("DELETE FROM client_error_states WHERE id = ?", [id])
+        else
+          db.execute(
+            "INSERT INTO client_error_states (id, status, changed_at, last_seen_at) VALUES (?, ?, ?, ?) " \
+            "ON CONFLICT(id) DO UPDATE SET status = excluded.status, changed_at = excluded.changed_at, last_seen_at = excluded.last_seen_at",
+            [id, status, changed_at.to_f, last_seen_at&.to_f]
+          )
+        end
+        nil
+      end
+
+      def purge_client_error_states(cutoff)
+        db.execute("DELETE FROM client_error_states WHERE changed_at < ?", [cutoff.to_f])
+        nil
+      end
+
       def clear!
         db.transaction(:immediate) do
           db.execute("DELETE FROM events")
@@ -512,6 +542,7 @@ module Sentiero
           db.execute("DELETE FROM problems")
           db.execute("DELETE FROM occurrences")
           db.execute("DELETE FROM server_events")
+          db.execute("DELETE FROM client_error_states")
         end
         nil
       end
@@ -535,6 +566,7 @@ module Sentiero
             [cutoff]
           )
           db.execute("DELETE FROM problems WHERE last_seen < ?", [cutoff])
+          db.execute("DELETE FROM client_error_states WHERE changed_at < ?", [cutoff])
         end
 
         session_count

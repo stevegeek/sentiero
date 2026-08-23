@@ -20,6 +20,8 @@ module Sentiero
       def create_migration_file
         migration_template "create_sentiero_tables.rb.erb",
           "db/migrate/create_sentiero_tables.rb"
+        migration_template "create_sentiero_client_error_states.rb.erb",
+          "db/migrate/create_sentiero_client_error_states.rb"
       end
 
       def create_initializer
