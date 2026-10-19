@@ -9,6 +9,12 @@ require "sentiero/roda"
 require "sentiero/reporter/middleware"
 
 def build_store
+  if ENV["SENTIERO_SQLITE_PATH"]
+    require "sentiero/stores/sqlite"
+    puts "==> Using SQLite store (#{ENV["SENTIERO_SQLITE_PATH"]})"
+    return Sentiero::Stores::SQLite.new(path: ENV["SENTIERO_SQLITE_PATH"])
+  end
+
   if ENV["REDIS_URL"]
     require "redis"
     require "sentiero/stores/redis"
