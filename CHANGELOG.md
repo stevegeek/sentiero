@@ -6,6 +6,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.0.0.beta4] - 2026-10-27
 
+- `Sentiero::Stores::SQLite#close` closes every connection the store opened.
+  A file-backed store opens one connection per thread, and a discarded store
+  kept its connections (and file descriptors) open on long-lived threads.
 - sentiero-rails: fix `LoadError: cannot load such file -- .../sentiero/reporter`
   when the installed gem boots (#14). The engine loaded the reporter from the
   core gem with `require_relative`, which only resolved inside this repo.

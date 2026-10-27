@@ -17,6 +17,7 @@ require "sentiero/stores/sqlite" if SQLITE_AVAILABLE
 module Sentiero
   module Stores
     class SQLiteTest < Minitest::Test
+      include SQLiteStoreTracking
       include StoreContractTests
       include ErrorStoreContractTests
 
@@ -32,7 +33,7 @@ module Sentiero
 
       def create_store
         skip "sqlite3 gem not available" unless SQLITE_AVAILABLE
-        Sentiero::Stores::SQLite.new(path: @db_path)
+        open_sqlite_store(path: @db_path)
       end
 
       def test_clear_removes_all_sessions_and_events
@@ -63,8 +64,8 @@ module Sentiero
         db_a = ::File.join(@tmpdir, "a.db")
         db_b = ::File.join(@tmpdir, "b.db")
 
-        store_a = Sentiero::Stores::SQLite.new(path: db_a)
-        store_b = Sentiero::Stores::SQLite.new(path: db_b)
+        store_a = open_sqlite_store(path: db_a)
+        store_b = open_sqlite_store(path: db_b)
 
         store_a.save_events(Sentiero::WindowRef.new("s1", "w1"), [{"timestamp" => 1.0, "type" => "click"}])
         store_b.save_events(Sentiero::WindowRef.new("s1", "w1"), [{"timestamp" => 2.0, "type" => "scroll"}])
@@ -79,10 +80,24 @@ module Sentiero
         assert_equal "scroll", result_b[0]["type"]
       end
 
+      def test_close_releases_connections_and_reopens_on_next_use
+        skip "sqlite3 gem not available" unless SQLITE_AVAILABLE
+
+        store = open_sqlite_store(path: @db_path)
+        ref = Sentiero::WindowRef.new("s1", "w1")
+        store.save_events(ref, [{"timestamp" => 1.0, "type" => "a"}])
+        connection = store.send(:db)
+
+        store.close
+
+        assert_predicate connection, :closed?
+        assert_equal 1, store.get_events(ref).size
+      end
+
       def test_in_memory_database
         skip "sqlite3 gem not available" unless SQLITE_AVAILABLE
 
-        store = Sentiero::Stores::SQLite.new(path: ":memory:")
+        store = open_sqlite_store(path: ":memory:")
         store.save_events(Sentiero::WindowRef.new("s1", "w1"), [{"timestamp" => 1.0, "type" => "a"}])
 
         result = store.get_events(Sentiero::WindowRef.new("s1", "w1"))
@@ -125,7 +140,7 @@ module Sentiero
         SQL
         legacy.close
 
-        store = Sentiero::Stores::SQLite.new(path: path)
+        store = open_sqlite_store(path: path)
 
         assert_equal 3, store.get_events(Sentiero::WindowRef.new("legacy-s1", "w1")).size
 

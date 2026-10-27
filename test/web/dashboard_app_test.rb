@@ -10,6 +10,7 @@ require "tmpdir"
 module Sentiero
   module Web
     class DashboardAppTest < Minitest::Test
+      include SQLiteStoreTracking
       include Rack::Test::Methods
 
       def app
@@ -124,7 +125,7 @@ module Sentiero
         require "sentiero/stores/sqlite"
 
         Dir.mktmpdir("sentiero_dashboard_clamp") do |dir|
-          Sentiero.configuration.store = Stores::SQLite.new(path: ::File.join(dir, "test.db"))
+          Sentiero.configuration.store = open_sqlite_store(path: ::File.join(dir, "test.db"))
 
           get "/?page=99999999999999999999"
 

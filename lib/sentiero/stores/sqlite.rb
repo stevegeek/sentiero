@@ -58,8 +58,23 @@ module Sentiero
         # a slow dashboard scan can't stall recorder ingest (and vice versa).
         @in_memory = @path == ":memory:" || @path.start_with?("file::memory:")
         @tls_key = :"sentiero_sqlite_#{object_id}"
+        # Every connection this store opened, across all threads, so #close can
+        # release them. Thread-locals alone outlive a discarded store on
+        # long-lived threads (puma workers, the test runner) and leak fds.
+        @connections = []
+        @connections_lock = Mutex.new
         @shared_db = create_connection if @in_memory
         Schema.create(db)
+      end
+
+      # Closes every connection this store opened. A file-backed store reopens a
+      # connection on next use; an in-memory store's data is gone for good.
+      def close
+        @connections_lock.synchronize do
+          @connections.each { |conn| conn.close unless conn.closed? }
+          @connections.clear
+        end
+        nil
       end
 
       # event_type_counts / event_counts_by_day group on indexed columns and
@@ -641,7 +656,10 @@ module Sentiero
       def db
         return @shared_db if @in_memory
 
-        Thread.current[@tls_key] ||= create_connection
+        conn = Thread.current[@tls_key]
+        return conn if conn && !conn.closed?
+
+        Thread.current[@tls_key] = create_connection
       end
 
       def create_connection
@@ -653,6 +671,7 @@ module Sentiero
         conn.busy_handler_timeout = 5_000
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA foreign_keys=ON")
+        @connections_lock.synchronize { @connections << conn }
         conn
       end
 

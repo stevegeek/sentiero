@@ -20,6 +20,8 @@ module Sentiero
     # transaction state ("cannot start a transaction within a transaction"). These
     # tests pin that all access is serialized.
     class SQLiteConcurrencyTest < Minitest::Test
+      include SQLiteStoreTracking
+
       # Holds save_events' transaction open (enforce_max_events runs inside it) so
       # a second writer deterministically collides on the shared connection unless
       # access is serialized. Without the in-transaction delay the race is real but
@@ -43,7 +45,7 @@ module Sentiero
       end
 
       def test_overlapping_writes_do_not_race_on_the_shared_connection
-        store = SlowSQLite.new(path: @db_path)
+        store = open_sqlite_store(SlowSQLite, path: @db_path)
         errors = collect_errors do |t|
           store.save_events(Sentiero::WindowRef.new("session-#{t}", "w1"),
             [{"timestamp" => 1.0, "type" => 3}])
@@ -53,7 +55,7 @@ module Sentiero
       end
 
       def test_concurrent_load_keeps_every_event
-        store = Sentiero::Stores::SQLite.new(path: @db_path)
+        store = open_sqlite_store(path: @db_path)
         writes = 25
         errors = collect_errors(threads: 12) do |t|
           writes.times do |i|
@@ -74,7 +76,7 @@ module Sentiero
       # save_events issued while a scan's consumer is mid-yield has to complete
       # promptly, not after the whole scan finishes.
       def test_save_events_is_not_blocked_by_a_slow_scan
-        store = Sentiero::Stores::SQLite.new(path: @db_path)
+        store = open_sqlite_store(path: @db_path)
         3.times do |i|
           store.save_events(Sentiero::WindowRef.new("session-#{i}", "w1"),
             [{"timestamp" => (i + 1).to_f, "type" => 3}])

@@ -17,10 +17,12 @@ module Sentiero
     # Correctness of each_session_events lives in the shared store contract; this
     # pins that the override stays batched (constant queries) rather than N+1.
     class SQLiteScanTest < Minitest::Test
+      include SQLiteStoreTracking
+
       def setup
         skip "sqlite3 gem not available" unless SQLITE_AVAILABLE
         @tmpdir = Dir.mktmpdir("sentiero_sqlite_scan")
-        @store = Sentiero::Stores::SQLite.new(path: ::File.join(@tmpdir, "test.db"))
+        @store = open_sqlite_store(path: ::File.join(@tmpdir, "test.db"))
       end
 
       def teardown

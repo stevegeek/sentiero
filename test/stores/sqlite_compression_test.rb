@@ -14,6 +14,8 @@ require "sentiero/stores/sqlite" if defined?(::SQLite3)
 module Sentiero
   module Stores
     class SQLiteCompressionTest < Minitest::Test
+      include SQLiteStoreTracking
+
       def setup
         skip "sqlite3 gem not available" unless defined?(::SQLite3)
         @tmpdir = Dir.mktmpdir("sentiero_sqlite_compression_test")
@@ -25,7 +27,7 @@ module Sentiero
       end
 
       def store
-        @store ||= Sentiero::Stores::SQLite.new(path: @db_path)
+        @store ||= open_sqlite_store(path: @db_path)
       end
 
       def raw_db
@@ -97,14 +99,14 @@ module Sentiero
         # file is).
         legacy = big_event
         legacy_json = JSON.generate(legacy)
-        seed = Sentiero::Stores::SQLite.new(path: @db_path)
+        seed = open_sqlite_store(path: @db_path)
         seed.save_events(Sentiero::WindowRef.new("s1", "w1"), [small_event])
         raw_db do |db|
           db.execute("UPDATE events SET data = ?", [legacy_json])
           db.execute("PRAGMA user_version = 0")
         end
 
-        reopened = Sentiero::Stores::SQLite.new(path: @db_path)
+        reopened = open_sqlite_store(path: @db_path)
 
         raw_db do |db|
           assert_equal "blob", db.get_first_value("SELECT typeof(data) FROM events"),

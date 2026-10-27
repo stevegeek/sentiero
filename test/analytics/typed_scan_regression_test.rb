@@ -31,12 +31,14 @@ module Sentiero
     # snapshot payloads are unreadable — success proves its scan filters them
     # out in SQL instead of parsing and discarding them.
     class TypedScanRegressionTest < Minitest::Test
+      include SQLiteStoreTracking
+
       URL = "https://example.test/menu"
 
       def setup
         skip "sqlite3 gem not available" unless SQLITE_AVAILABLE
         @tmpdir = Dir.mktmpdir("sentiero_typed_scan")
-        @store = Sentiero::Stores::SQLite.new(path: ::File.join(@tmpdir, "test.db"))
+        @store = open_sqlite_store(path: ::File.join(@tmpdir, "test.db"))
 
         t = Time.now.to_f * 1000
         @store.save_events(Sentiero::WindowRef.new("s1", "w1"), [
