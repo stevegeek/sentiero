@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 require_relative "helpers/script_tag_helper"
-require_relative "../reporter"
-require_relative "../reporter/middleware"
+# The reporter ships in the core sentiero gem, which installs to a separate
+# directory, so it must be loaded via the load path, not require_relative.
+require "sentiero/reporter"
+require "sentiero/reporter/middleware"
 
 module Sentiero
   module Rails

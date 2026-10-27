@@ -6,6 +6,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+- sentiero-rails: fix `LoadError: cannot load such file -- .../sentiero/reporter`
+  when the installed gem boots (#14). The engine loaded the reporter from the
+  core gem with `require_relative`, which only resolved inside this repo.
+- sentiero-rails: `rails generate sentiero:install` now finds the generator.
+  It moved to the standard `lib/generators/sentiero/` location.
 - Client-side JS error groups can be marked Resolved or Ignored from the
   errors list and the detail page, with a Reopen action and a Status filter
   (Open, Resolved, Ignored, All; Open is the default). A resolved group that

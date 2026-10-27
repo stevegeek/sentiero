@@ -2,7 +2,7 @@
 
 require_relative "../test_helper"
 require "rails/generators/test_case"
-require "sentiero/rails/generators/sentiero/install_generator"
+require "generators/sentiero/install_generator"
 
 class Sentiero::Generators::InstallGeneratorTest < ::Rails::Generators::TestCase
   tests Sentiero::Generators::InstallGenerator
@@ -10,6 +10,14 @@ class Sentiero::Generators::InstallGeneratorTest < ::Rails::Generators::TestCase
 
   setup do
     prepare_destination
+  end
+
+  # `rails generate sentiero:install` only finds generators under a
+  # generators/ (or rails/generators/) directory on the load path.
+  # find_by_namespace would also match the already-loaded class, so check the
+  # path Rails requires for "sentiero:install" instead.
+  test "is discoverable by its namespace" do
+    assert $LOAD_PATH.resolve_feature_path("generators/sentiero/install_generator")
   end
 
   test "creates migration file" do

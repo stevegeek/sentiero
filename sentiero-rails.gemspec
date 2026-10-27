@@ -14,12 +14,13 @@ Gem::Specification.new do |spec|
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.3.0"
 
-  # Ship only git-tracked Rails-engine source plus the license. No compiled
+  # Ship only git-tracked Rails-engine source, the generator (which must sit at
+  # lib/generators/ for `rails generate` to find it) plus the license. No compiled
   # assets here: those live in the core sentiero gem.
   tracked = IO.popen(%w[git ls-files -z], chdir: __dir__, err: IO::NULL, &:read).split("\x0")
   spec.files = tracked.select { |f|
     File.file?(File.join(__dir__, f)) &&
-      (f == "lib/sentiero/rails.rb" || f.start_with?("lib/sentiero/rails/") || f == "LICENSE.txt")
+      (f == "lib/sentiero/rails.rb" || f.start_with?("lib/sentiero/rails/", "lib/generators/") || f == "LICENSE.txt")
   }
   spec.require_paths = ["lib"]
 

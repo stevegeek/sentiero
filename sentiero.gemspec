@@ -29,7 +29,7 @@ Gem::Specification.new do |spec|
   spec.files = (tracked + assets).uniq.select { |f|
     File.file?(File.join(__dir__, f)) &&
       (f.start_with?("lib/") || %w[LICENSE.txt README.md].include?(f))
-  }.reject { |f| f.start_with?("lib/sentiero/rails") }
+  }.reject { |f| f.start_with?("lib/sentiero/rails", "lib/generators/") }
   spec.require_paths = ["lib"]
 
   spec.add_dependency "rack", ">= 2.0", "< 4.0"
